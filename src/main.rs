@@ -1,4 +1,5 @@
 mod generate;
+mod solve;
 mod tsp_types;
 
 use std::{ fs, path::{ PathBuf, Path }, str::FromStr };
@@ -127,5 +128,11 @@ fn main() {
             Ok(_) => println!("TSP problems generated successfully."),
             Err(e) => println!("Failed to generate TSP problems because of an IO error: {}", e),
         }
+    }
+
+    // Check if we are solving data
+    match solve::solve_tsp(data_path, vec![(tsp_types::TSPAlgorithm::NaiveHeuristic, None)]) {
+        Ok(_) => println!("TSP problems solved successfully."),
+        Err(e) => println!("Failed to solve TSP problems because of an IO error: {}", e),
     }
 }

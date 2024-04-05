@@ -3,7 +3,7 @@ mod euclidean;
 use std::path::Path;
 use std::io::Error;
 
-use indicatif::ProgressBar;
+use indicatif::{ ProgressBar, ProgressStyle };
 use rayon::ThreadPoolBuilder;
 use rayon::prelude::*;
 
@@ -47,6 +47,11 @@ pub fn generate_tsp_problems(
     // Setup progress bar
     let pb = ProgressBar::new((problem_sizes.len() as u64) * num_problems_per_size);
 
+    let sty = ProgressStyle::with_template(
+        "[{elapsed_precise}] {bar:100.cyan/blue} {pos:>7}/{len:7} {msg}"
+    ).unwrap();
+    pb.set_style(sty);
+
     // Generate TSP problems using the euclidean distance method
     let pool = match ThreadPoolBuilder::new().num_threads(THREAD_POOL_SIZE).build() {
         Ok(pool) => pool,
@@ -56,6 +61,8 @@ pub fn generate_tsp_problems(
         }
     };
     for problem_size in problem_sizes {
+        pb.set_message(format!("Generating TSP problems for problem size: {}", problem_size));
+
         // Calculate how many TSP problems we still need to generate
         let current_num_problems_generated = get_num_existing_tsp_problems_by_size(
             data_path,
