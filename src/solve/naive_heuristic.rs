@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::tsp_types::{ TSPProblem, TSPSolution, TSPAlgorithm };
+use crate::types::{ TSPProblem, TSPSolution, TSPAlgorithm };
 
 fn calc_naive_heuristic_for_single_city(
     priority_city: u64,

@@ -78,11 +78,15 @@ pub fn solve_tsp(
                     TSPAlgorithm::LinKernighan => {
                         // Solve the TSP problem using the Lin-Kernighan algorithm
                         // with the provided timeout
-                        let solution = lin_kernighan::calc_lin_kernighan_heuristic(
-                            &tsp_packaged_prob.problem_data,
-                            10
-                        );
-                        tsp_packaged_prob.solutions.push(solution);
+                        // will return None if the graph is directed
+                        if
+                            let Some(solution) = lin_kernighan::calc_lin_kernighan_heuristic(
+                                &tsp_packaged_prob.problem_data,
+                                10
+                            )
+                        {
+                            tsp_packaged_prob.solutions.push(solution);
+                        }
                     }
                     TSPAlgorithm::Pseudorandom => {
                         // Solve the TSP problem using the Pseudorandom algorithm
