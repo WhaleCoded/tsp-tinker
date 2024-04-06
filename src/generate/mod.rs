@@ -19,6 +19,7 @@ fn generate_single_problem(problem_size: u64, data_path: &Path) -> Result<(), Er
     let tsp_problem = TSPProblem {
         num_cities: problem_size,
         city_connections_w_costs: distance_matrix,
+        undirected_edges: true,
     };
     let tsp_package = TSPPackage::new(tsp_problem);
 
