@@ -1,6 +1,6 @@
 mod generate;
 mod solve;
-mod tsp_types;
+mod types;
 
 use std::{ fs, path::{ PathBuf, Path }, str::FromStr };
 use clap::{ Arg, ArgAction, Command };
@@ -37,16 +37,25 @@ fn main() {
         .required(false)
         .help("Solve TSP problems using the Branch and Bound algorithm.");
     // Override any data at the path specified
+    let force_arg = Arg::new("force")
+        .short('f')
+        .action(ArgAction::SetTrue)
+        .required(false)
+        .help(
+            "Force the re-solve of TSP problems even if they were already solved by the specified algorithm."
+        );
 
     // Take all the arguments and create a command line interface
     let args = Command::new("tsp")
         .arg(data_path_arg)
         .arg(generate_arg)
         .arg(lin_kernighan_arg)
-        .arg(b_n_b_arg);
+        .arg(b_n_b_arg)
+        .arg(force_arg);
 
     // Parse the command line arguments
     let matches = args.get_matches();
+    let force: bool = *matches.get_one("force").unwrap();
 
     // Get the data path
     let data_path = Path::new(matches.get_one::<PathBuf>("data-path").unwrap());
@@ -131,7 +140,7 @@ fn main() {
     }
 
     // Check if we are solving data
-    match solve::solve_tsp(data_path, vec![(tsp_types::TSPAlgorithm::NaiveHeuristic, None)]) {
+    match solve::solve_tsp(data_path, vec![(types::TSPAlgorithm::LinKernighan, None)], force) {
         Ok(_) => println!("TSP problems solved successfully."),
         Err(e) => println!("Failed to solve TSP problems because of an IO error: {}", e),
     }

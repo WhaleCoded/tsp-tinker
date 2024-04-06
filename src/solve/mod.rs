@@ -1,12 +1,13 @@
 mod lin_kernighan;
 mod naive_heuristic;
+mod utils;
 
 use std::path::Path;
 use std::io::Error;
 
 use indicatif::{ MultiProgress, ProgressBar, ProgressStyle };
 
-use crate::tsp_types::{
+use crate::types::{
     get_subdirectories_of_tsp_problems,
     get_num_existing_tsp_problems_by_sub_dir,
     get_tsp_problem_file_paths_by_sub_dir,
@@ -16,7 +17,8 @@ use crate::tsp_types::{
 
 pub fn solve_tsp(
     data_path: &Path,
-    selected_algorithms_and_timeout: Vec<(TSPAlgorithm, Option<u32>)>
+    selected_algorithms_and_timeout: Vec<(TSPAlgorithm, Option<u32>)>,
+    force_resolve: bool
 ) -> Result<(), Error> {
     // Use the data path to find the TSP problems to solve
     // setup a progress to track our overall progress
@@ -59,7 +61,13 @@ pub fn solve_tsp(
             for (algorithm, timeout) in &selected_algorithms_and_timeout {
                 // Check if the problem has already been solved
                 if tsp_packaged_prob.has_been_solved_by_algorithm(algorithm) {
-                    continue;
+                    if force_resolve {
+                        // remove the previous solution
+                        tsp_packaged_prob.remove_solution_by_algorithm(algorithm);
+                    } else {
+                        // skip this algorithm
+                        continue;
+                    }
                 }
 
                 match algorithm {

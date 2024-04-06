@@ -8,7 +8,7 @@ use rayon::ThreadPoolBuilder;
 use rayon::prelude::*;
 
 use euclidean::{ generate_city_coordinates, generate_euclidean_distance_matrix };
-use crate::tsp_types::{ TSPProblem, TSPPackage, get_num_existing_tsp_problems_by_size };
+use crate::types::{ TSPProblem, TSPPackage, get_num_existing_tsp_problems_by_size };
 
 const THREAD_POOL_SIZE: usize = 30;
 
