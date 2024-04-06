@@ -9,6 +9,8 @@ pub use helpers::{
     get_subdirectories_of_tsp_problems,
     get_num_existing_tsp_problems_by_sub_dir,
     get_tsp_problem_file_paths_by_sub_dir,
+    convert_undirected_matrix_to_edges,
+    convert_undirected_edges_into_tour,
 };
 
 #[derive(serde::Deserialize, Clone, serde::Serialize)]
@@ -20,11 +22,10 @@ pub struct TSPSolution {
     pub algorithm_name: String,
 }
 
-#[derive(serde::Deserialize, Clone, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, Copy, Clone, serde::Serialize)]
 pub struct UndirectedEdge {
     pub city_a: u64,
     pub city_b: u64,
-    pub cost: f32,
 }
 
 #[derive(Clone)]

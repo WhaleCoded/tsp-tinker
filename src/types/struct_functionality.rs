@@ -1,6 +1,6 @@
-use std::{ fs::File, io::Error, path::Path };
+use std::{ fmt::Display, fs::File, hash::{ Hash, Hasher }, io::Error, path::Path };
 
-use super::{ TSPAlgorithm, TSPProblem, TSPSolution, TSPPackage };
+use super::{ TSPAlgorithm, TSPProblem, TSPSolution, TSPPackage, UndirectedEdge };
 
 pub fn create_json_sub_dir_name(num_cities: u64) -> String {
     return format!("tsp_problems_of_{}_cities", num_cities);
@@ -82,5 +82,42 @@ impl TSPPackage {
         }
 
         return None;
+    }
+}
+
+impl PartialEq for UndirectedEdge {
+    fn eq(&self, other: &Self) -> bool {
+        // Sort the cities in the edge so that the comparison is order independent
+        let mut ordered_cities = vec![self.city_a, self.city_b];
+        ordered_cities.sort();
+
+        let mut other_ordered_cities = vec![other.city_a, other.city_b];
+        other_ordered_cities.sort();
+
+        return ordered_cities == other_ordered_cities;
+    }
+}
+
+impl Eq for UndirectedEdge {}
+impl Hash for UndirectedEdge {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut ordered_cities = vec![self.city_a, self.city_b];
+        ordered_cities.sort();
+        ordered_cities.hash(state);
+    }
+}
+
+impl Display for UndirectedEdge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.city_a, self.city_b)
+    }
+}
+
+impl UndirectedEdge {
+    pub fn new(city_a: u64, city_b: u64) -> UndirectedEdge {
+        return UndirectedEdge {
+            city_a,
+            city_b,
+        };
     }
 }

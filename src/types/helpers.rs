@@ -1,5 +1,9 @@
 use std::{ io::Error, path::{ Path, PathBuf } };
+use ndarray::Array1;
+
 use crate::types::struct_functionality::create_json_sub_dir_name;
+
+use super::UndirectedEdge;
 
 pub fn get_subdirectories_of_tsp_problems(data_path: &Path) -> Result<Vec<PathBuf>, Error> {
     let mut sub_dirs: Vec<PathBuf> = vec![];
@@ -106,4 +110,73 @@ pub fn get_tsp_problem_file_paths_by_sub_dir(sub_dir_path: &Path) -> Result<Vec<
     }
 
     return Ok(json_file_paths);
+}
+
+pub fn convert_undirected_matrix_to_edges(num_cities: &u64) -> Vec<UndirectedEdge> {
+    let mut edges: Vec<UndirectedEdge> = vec![];
+
+    for i in 0..*num_cities {
+        for j in i + 1..*num_cities {
+            edges.push(UndirectedEdge {
+                city_a: i as u64,
+                city_b: j as u64,
+            });
+        }
+    }
+
+    return edges;
+}
+
+fn group_undirected_edges_into_array(
+    num_cities: u64,
+    undirected_edges: &Vec<UndirectedEdge>
+) -> Array1<Vec<UndirectedEdge>> {
+    let mut grouped_edges: Array1<Vec<UndirectedEdge>> = Array1::from(
+        vec![vec![]; num_cities as usize]
+    );
+
+    for edge in undirected_edges {
+        grouped_edges[edge.city_a as usize].push(edge.clone());
+        grouped_edges[edge.city_b as usize].push(edge.clone());
+    }
+
+    return grouped_edges;
+}
+
+pub fn convert_undirected_edges_into_tour(
+    num_cities: u64,
+    undirected_edges: &Vec<UndirectedEdge>
+) -> Vec<u64> {
+    let mut tour = vec![];
+
+    let mut grouped_edges = group_undirected_edges_into_array(num_cities, undirected_edges);
+
+    // There must be 2 edges for each city to be a valid tour
+    for city_edges in grouped_edges.iter() {
+        assert_eq!(city_edges.len(), 2);
+    }
+
+    let mut curr_city: u64 = 0;
+    while tour.len() < (num_cities as usize) {
+        // Get edge that hasn't been visited for the current city
+        let next_edge = grouped_edges[curr_city as usize]
+            .pop()
+            .expect("There should be exactly 2 edges for each city");
+
+        // Add the other city of the edge to the tour
+        let next_city = match next_edge.city_a {
+            _ if curr_city == next_edge.city_a => next_edge.city_b,
+            _ => next_edge.city_a,
+        };
+
+        // Remove next_ctiy's edge to curr_city
+        grouped_edges[next_city as usize].retain(|edge| { edge != &next_edge });
+
+        tour.push(next_city);
+        curr_city = next_city;
+    }
+
+    assert!(tour.len() == (num_cities as usize));
+
+    return tour;
 }
