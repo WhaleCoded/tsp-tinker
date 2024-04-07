@@ -1,6 +1,12 @@
-use std::{ fmt::Display, fs::File, hash::{ Hash, Hasher }, io::Error, path::Path };
+use std::{
+    fmt::Display,
+    fs::File,
+    hash::{Hash, Hasher},
+    io::Error,
+    path::Path,
+};
 
-use super::{ TSPAlgorithm, TSPProblem, TSPSolution, TSPPackage, UndirectedEdge };
+use super::{TSPAlgorithm, TSPPackage, TSPProblem, TSPSolution, UndirectedEdge};
 
 pub fn create_json_sub_dir_name(num_cities: u64) -> String {
     return format!("tsp_problems_of_{}_cities", num_cities);
@@ -29,9 +35,8 @@ impl TSPPackage {
 
     pub fn store_as_json(&self, primary_data_path: &Path) -> Result<(), Error> {
         // Create or verify the existence of the subdirectory
-        let sub_directory_path = primary_data_path.join(
-            create_json_sub_dir_name(self.problem_data.num_cities)
-        );
+        let sub_directory_path =
+            primary_data_path.join(create_json_sub_dir_name(self.problem_data.num_cities));
         match sub_directory_path.exists() {
             true => {}
             false => {
@@ -71,7 +76,8 @@ impl TSPPackage {
     }
 
     pub fn remove_solution_by_algorithm(&mut self, algorithm: &TSPAlgorithm) {
-        self.solutions.retain(|solution| solution.algorithm_name != algorithm.to_string());
+        self.solutions
+            .retain(|solution| solution.algorithm_name != algorithm.to_string());
     }
 
     pub fn get_solution_by_algorithm(&self, algorithm: &TSPAlgorithm) -> Option<&TSPSolution> {
@@ -115,9 +121,6 @@ impl Display for UndirectedEdge {
 
 impl UndirectedEdge {
     pub fn new(city_a: u64, city_b: u64) -> UndirectedEdge {
-        return UndirectedEdge {
-            city_a,
-            city_b,
-        };
+        return UndirectedEdge { city_a, city_b };
     }
 }

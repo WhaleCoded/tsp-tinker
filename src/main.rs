@@ -2,8 +2,12 @@ mod generate;
 mod solve;
 mod types;
 
-use std::{ fs, path::{ PathBuf, Path }, str::FromStr };
-use clap::{ Arg, ArgAction, Command };
+use clap::{Arg, ArgAction, Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 fn main() {
     // Data Path
@@ -110,23 +114,20 @@ fn main() {
 
                 println!(
                     "Generating {} TSP problems for each problem size: {}-{}",
-                    num_problems_per_size,
-                    start_size,
-                    end_size
+                    num_problems_per_size, start_size, end_size
                 );
 
                 generate::generate_tsp_problems(
                     data_path,
                     num_problems_per_size,
                     start_size,
-                    Some(*end_size)
+                    Some(*end_size),
                 )
             }
             None => {
                 println!(
                     "Generating {} TSP problems for the problem size {}",
-                    num_problems_per_size,
-                    start_size
+                    num_problems_per_size, start_size
                 );
 
                 generate::generate_tsp_problems(data_path, num_problems_per_size, start_size, None)
@@ -135,12 +136,19 @@ fn main() {
 
         match generation_result {
             Ok(_) => println!("TSP problems generated successfully."),
-            Err(e) => println!("Failed to generate TSP problems because of an IO error: {}", e),
+            Err(e) => println!(
+                "Failed to generate TSP problems because of an IO error: {}",
+                e
+            ),
         }
     }
 
     // Check if we are solving data
-    match solve::solve_tsp(data_path, vec![(types::TSPAlgorithm::LinKernighan, None)], force) {
+    match solve::solve_tsp(
+        data_path,
+        vec![(types::TSPAlgorithm::LinKernighan, None)],
+        force,
+    ) {
         Ok(_) => println!("TSP problems solved successfully."),
         Err(e) => println!("Failed to solve TSP problems because of an IO error: {}", e),
     }

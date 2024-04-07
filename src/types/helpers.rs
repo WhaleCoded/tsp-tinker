@@ -1,5 +1,8 @@
-use std::{ io::Error, path::{ Path, PathBuf } };
 use ndarray::Array1;
+use std::{
+    io::Error,
+    path::{Path, PathBuf},
+};
 
 use crate::types::struct_functionality::create_json_sub_dir_name;
 
@@ -54,7 +57,7 @@ pub fn get_subdirectories_of_tsp_problems(data_path: &Path) -> Result<Vec<PathBu
 
 pub fn get_num_existing_tsp_problems_by_size(
     data_path: &Path,
-    problem_size: u64
+    problem_size: u64,
 ) -> Result<u64, Error> {
     let subdirectory_path = data_path.join(create_json_sub_dir_name(problem_size));
     match subdirectory_path.exists() {
@@ -129,11 +132,10 @@ pub fn convert_undirected_matrix_to_edges(num_cities: &u64) -> Vec<UndirectedEdg
 
 fn group_undirected_edges_into_array(
     num_cities: u64,
-    undirected_edges: &Vec<UndirectedEdge>
+    undirected_edges: &Vec<UndirectedEdge>,
 ) -> Array1<Vec<UndirectedEdge>> {
-    let mut grouped_edges: Array1<Vec<UndirectedEdge>> = Array1::from(
-        vec![vec![]; num_cities as usize]
-    );
+    let mut grouped_edges: Array1<Vec<UndirectedEdge>> =
+        Array1::from(vec![vec![]; num_cities as usize]);
 
     for edge in undirected_edges {
         grouped_edges[edge.city_a as usize].push(edge.clone());
@@ -145,7 +147,7 @@ fn group_undirected_edges_into_array(
 
 pub fn convert_undirected_edges_into_tour(
     num_cities: u64,
-    undirected_edges: &Vec<UndirectedEdge>
+    undirected_edges: &Vec<UndirectedEdge>,
 ) -> Vec<u64> {
     let mut tour = vec![];
 
@@ -170,7 +172,7 @@ pub fn convert_undirected_edges_into_tour(
         };
 
         // Remove next_ctiy's edge to curr_city
-        grouped_edges[next_city as usize].retain(|edge| { edge != &next_edge });
+        grouped_edges[next_city as usize].retain(|edge| edge != &next_edge);
 
         tour.push(next_city);
         curr_city = next_city;

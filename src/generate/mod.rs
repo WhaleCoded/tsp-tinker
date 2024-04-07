@@ -1,14 +1,14 @@
 mod euclidean;
 
-use std::path::Path;
 use std::io::Error;
+use std::path::Path;
 
-use indicatif::{ ProgressBar, ProgressStyle };
-use rayon::ThreadPoolBuilder;
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use rayon::ThreadPoolBuilder;
 
-use euclidean::{ generate_city_coordinates, generate_euclidean_distance_matrix };
-use crate::types::{ TSPProblem, TSPPackage, get_num_existing_tsp_problems_by_size };
+use crate::types::{get_num_existing_tsp_problems_by_size, TSPPackage, TSPProblem};
+use euclidean::{generate_city_coordinates, generate_euclidean_distance_matrix};
 
 const THREAD_POOL_SIZE: usize = 30;
 
@@ -32,7 +32,7 @@ pub fn generate_tsp_problems(
     data_path: &Path,
     num_problems_per_size: u64,
     starting_problem_size: u64,
-    ending_problem_size: Option<u64>
+    ending_problem_size: Option<u64>,
 ) -> Result<(), Error> {
     let mut problem_sizes = vec![starting_problem_size];
 
@@ -49,26 +49,34 @@ pub fn generate_tsp_problems(
     let pb = ProgressBar::new((problem_sizes.len() as u64) * num_problems_per_size);
 
     let sty = ProgressStyle::with_template(
-        "[{elapsed_precise}] {bar:100.cyan/blue} {pos:>7}/{len:7} {msg}"
-    ).unwrap();
+        "[{elapsed_precise}] {bar:100.cyan/blue} {pos:>7}/{len:7} {msg}",
+    )
+    .unwrap();
     pb.set_style(sty);
 
     // Generate TSP problems using the euclidean distance method
-    let pool = match ThreadPoolBuilder::new().num_threads(THREAD_POOL_SIZE).build() {
+    let pool = match ThreadPoolBuilder::new()
+        .num_threads(THREAD_POOL_SIZE)
+        .build()
+    {
         Ok(pool) => pool,
         Err(e) => {
             eprintln!("Error creating thread pool: {}", e);
-            return Err(Error::new(std::io::ErrorKind::Other, "Error creating thread pool"));
+            return Err(Error::new(
+                std::io::ErrorKind::Other,
+                "Error creating thread pool",
+            ));
         }
     };
     for problem_size in problem_sizes {
-        pb.set_message(format!("Generating TSP problems for problem size: {}", problem_size));
+        pb.set_message(format!(
+            "Generating TSP problems for problem size: {}",
+            problem_size
+        ));
 
         // Calculate how many TSP problems we still need to generate
-        let current_num_problems_generated = get_num_existing_tsp_problems_by_size(
-            data_path,
-            problem_size
-        )?;
+        let current_num_problems_generated =
+            get_num_existing_tsp_problems_by_size(data_path, problem_size)?;
 
         if current_num_problems_generated >= num_problems_per_size {
             pb.inc(num_problems_per_size);

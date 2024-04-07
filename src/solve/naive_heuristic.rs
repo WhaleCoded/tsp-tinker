@@ -1,10 +1,10 @@
 use std::time::Instant;
 
-use crate::types::{ TSPProblem, TSPSolution, TSPAlgorithm };
+use crate::types::{TSPAlgorithm, TSPProblem, TSPSolution};
 
 fn calc_naive_heuristic_for_single_city(
     priority_city: u64,
-    tsp_problem: &TSPProblem
+    tsp_problem: &TSPProblem,
 ) -> (Vec<u64>, f32) {
     // The naive heuristic will choose the smallest connection available starting with the priority city
     // With each selection of the smallest connection, we limit future more optimal tour possibilities
@@ -18,7 +18,9 @@ fn calc_naive_heuristic_for_single_city(
     let mut current_city: u64 = priority_city;
     while tour.len() < (tsp_problem.num_cities as usize) {
         // get the row of the current city
-        let row = &tsp_problem.city_connections_w_costs.row(current_city as usize);
+        let row = &tsp_problem
+            .city_connections_w_costs
+            .row(current_city as usize);
 
         if tour.len() == (tsp_problem.num_cities as usize) - 1 {
             // add the first city to the end of the tour
@@ -29,11 +31,10 @@ fn calc_naive_heuristic_for_single_city(
             let mut smallest_cost = f32::INFINITY;
             let mut smallest_city = 0;
             for (city, &cost) in row.iter().enumerate() {
-                if
-                    cost < smallest_cost &&
-                    !tour.contains(&(city as u64)) &&
-                    city != (current_city as usize) &&
-                    city != (priority_city as usize)
+                if cost < smallest_cost
+                    && !tour.contains(&(city as u64))
+                    && city != (current_city as usize)
+                    && city != (priority_city as usize)
                 {
                     smallest_cost = cost;
                     smallest_city = city as u64;
