@@ -9,6 +9,8 @@ use crate::types::{
     convert_undirected_edges_into_tour, TSPAlgorithm, TSPProblem, TSPSolution, UndirectedEdge,
 };
 
+const MAX_Y_OPTIONS: usize = 5;
+
 pub fn generate_pseudorandom_solution(tsp_problem: &TSPProblem) -> TSPSolution {
     // Get start time
     let start_time = Instant::now();
@@ -81,6 +83,41 @@ fn get_edges_for_node(node: u64, tsp_tour: &Vec<u64>) -> Vec<UndirectedEdge> {
     }
 
     return vec![in_edge, out_edge];
+}
+
+fn get_viable_y_edges_ordered_by_best_value(
+    t_nodes: &Vec<u64>,
+    x_connections: &Vec<UndirectedEdge>,
+    available_nodes: &HashSet<u64>,
+    connection_and_cost_matrix: &Array2<f32>,
+    broken_connections: &HashSet<UndirectedEdge>,
+) -> Vec<(UndirectedEdge, u64, f32)> {
+    let mut y_edges: Vec<(UndirectedEdge, u64, f32)> = vec![];
+
+    let t_2i = t_nodes[t_nodes.len() - 1];
+    let last_xi = x_connections[x_connections.len() - 1];
+    let x_cost = connection_and_cost_matrix[[last_xi.city_a as usize, last_xi.city_b as usize]];
+
+    println!("Available nodes: {:?}", available_nodes);
+    println!("T nodes: {:?}", t_nodes);
+    for node in available_nodes.iter() {
+        let y_edge_candidate = UndirectedEdge::new(t_2i, *node);
+        println!("Checking y edge candidate: {}", y_edge_candidate);
+        if !broken_connections.contains(&y_edge_candidate) {
+            let y_cost = connection_and_cost_matrix[[t_2i as usize, *node as usize]];
+            println!("Cost of y edge candidate: {}", y_cost);
+            let improvement = x_cost - y_cost;
+            println!("Improvement: {}", improvement);
+            if improvement > 0.0 {
+                y_edges.push((y_edge_candidate, *node, improvement));
+            }
+        }
+    }
+
+    // Sort by improvement
+    y_edges.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+
+    return y_edges;
 }
 
 fn choose_y_edge(
@@ -472,37 +509,64 @@ fn step_3_with_back_tracking(
     println!("Step 3");
     let mut tot_gain = 0.0;
 
-    // select y-1 implies t-3
-    if let Some((y_edge, t_3, gain)) = choose_y_edge(
-        &pre_selected_x_connections,
-        &tsp_problem.city_connections_w_costs,
+    let mut possible_y1_options = get_viable_y_edges_ordered_by_best_value(
         &t_nodes,
+        &pre_selected_x_connections,
         &available_nodes,
+        &tsp_problem.city_connections_w_costs,
         &pre_selected_broken_connections,
-    ) {
+    );
+    println!(
+        "Possible y1 options: [{}]",
+        possible_y1_options
+            .iter()
+            .map(|p| format!("{} : {}", p.2.to_string(), p.0.to_string()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    possible_y1_options.truncate(MAX_Y_OPTIONS);
+
+    for (y_edge, t_3, gain) in possible_y1_options {
+        // select y-1 implies t-3
+        println!("Selected y1: {}", y_edge);
+        println!("This implies t3: {}", t_3);
         y_connections.push(y_edge);
         t_nodes.push(t_3);
         available_nodes.remove(&t_3);
         joined_connections.insert(y_edge);
         tot_gain += gain;
-    } else {
-        // Go to Step 6(d)
-        return None;
+
+        // Move to next step
+        let t_prime = step_4_with_back_tracking(
+            starting_path,
+            tsp_problem,
+            &t_nodes,
+            &pre_selected_x_connections,
+            &y_connections,
+            &available_nodes,
+            &pre_selected_broken_connections,
+            &joined_connections,
+            &tot_gain,
+        );
+
+        if t_prime.is_some() {
+            return t_prime;
+        }
+
+        // Backtrack and undo changes
+        println!("Backtracking to try new y1 edge...");
+        let t3 = t_nodes
+            .pop()
+            .expect("We pushed t3 we should be able to pop.");
+        available_nodes.insert(t3);
+        let y1 = y_connections
+            .pop()
+            .expect("We pushed y1 we should be able to pop.");
+        joined_connections.remove(&y1);
+        tot_gain -= gain;
     }
 
-    let t_prime = step_4_with_back_tracking(
-        starting_path,
-        tsp_problem,
-        &t_nodes,
-        &pre_selected_x_connections,
-        &y_connections,
-        &available_nodes,
-        &pre_selected_broken_connections,
-        &joined_connections,
-        &tot_gain,
-    );
-
-    return t_prime;
+    return None;
 }
 
 fn step_2_with_back_tracking(
