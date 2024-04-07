@@ -362,19 +362,73 @@ fn construct_t_prime(
     return t_prime;
 }
 
-fn step_4_with_back_tracking(
+fn step_5(
+    best_improvement: f32,
+    t_nodes: &Vec<u64>,
+    x_connections: &Vec<UndirectedEdge>,
+    y_connections: &Vec<UndirectedEdge>,
     starting_path: &Vec<u64>,
-    tsp_problem: &TSPProblem,
+) -> Option<Vec<u64>> {
+    println!("Step 5");
+    // if best_improvement is positive then apply the changes to form T`
+    if best_improvement > 0.0 {
+        println!("Positive gain found. Constructing T'...");
+        let t_prime = construct_t_prime(&t_nodes, &x_connections, &y_connections, &starting_path);
+        println!(
+            "Constructed T': [{}]",
+            t_prime
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
+        return Some(t_prime);
+    }
+
+    return None;
+}
+
+fn loop_should_be_closed(
+    best_improvement: f32,
+    tot_curr_gain: f32,
+    x_edge: &UndirectedEdge,
+    t_nodes: &Vec<u64>,
+    city_connections_w_costs: &Array2<f32>,
+) -> Option<f32> {
+    // check gain of closing the loop between t-2i and t1 compared to xi
+    println!("Checking gain of closing the loop between t-2i and t1 compared to xi...");
+    let x_cost = city_connections_w_costs[[x_edge.city_a as usize, x_edge.city_b as usize]];
+    let close_loop_cost =
+        city_connections_w_costs[[t_nodes[0] as usize, t_nodes[t_nodes.len() - 1] as usize]];
+    let close_loop_gain = x_cost - close_loop_cost;
+    let gi_star = tot_curr_gain + close_loop_gain;
+    println!("Gain of closing the loop: {}", close_loop_gain);
+    println!("Total gain: {}", gi_star);
+    println!("Best improvement so far: {}", best_improvement);
+
+    if gi_star > best_improvement {
+        println!("New best improvement: {}", gi_star);
+        return Some(gi_star);
+    }
+
+    return None;
+}
+
+fn step_4_change_loop(
+    best_improvement: f32,
+    tot_gain: f32,
+    starting_path: &Vec<u64>,
     pre_selected_t_nodes: &Vec<u64>,
     pre_selected_x_connections: &Vec<UndirectedEdge>,
     pre_selected_y_connections: &Vec<UndirectedEdge>,
     pre_selected_available_nodes: &HashSet<u64>,
-    pre_selected_broken_connections: &HashSet<UndirectedEdge>,
     pre_selected_joined_connections: &HashSet<UndirectedEdge>,
-    pre_selected_tot_gain: &f32,
+    pre_selected_broken_connections: &HashSet<UndirectedEdge>,
+    city_connections_w_costs: &Array2<f32>,
 ) -> Option<Vec<u64>> {
-    let mut best_improvement = 0.0;
-    let mut tot_gain = *pre_selected_tot_gain;
+    let mut best_improvement = best_improvement;
+    let mut tot_gain = tot_gain;
     let mut t_nodes = pre_selected_t_nodes.clone();
     let mut x_connections = pre_selected_x_connections.clone();
     let mut y_connections = pre_selected_y_connections.clone();
@@ -382,10 +436,6 @@ fn step_4_with_back_tracking(
     let mut broken_connections = pre_selected_broken_connections.clone();
     let mut joined_connections = pre_selected_joined_connections.clone();
 
-    // Step 4
-    println!("Step 4");
-
-    // choose new x-i
     loop {
         if
         // implies t-2i
@@ -402,29 +452,28 @@ fn step_4_with_back_tracking(
             available_nodes.remove(&t2i);
 
             // check gain of closing the loop between t-2i and t1 compared to xi
-            println!("Checking gain of closing the loop between t-2i and t1 compared to xi...");
-            let x_cost = tsp_problem.city_connections_w_costs
-                [[x_edge.city_a as usize, x_edge.city_b as usize]];
-            let close_loop_cost = tsp_problem.city_connections_w_costs
-                [[t_nodes[0] as usize, t_nodes[t_nodes.len() - 1] as usize]];
-            let close_loop_gain = x_cost - close_loop_cost;
-            let gi_star = tot_gain + close_loop_gain;
-            println!("Gain of closing the loop: {}", close_loop_gain);
-            println!("Total gain: {}", gi_star);
-            println!("Best improvement so far: {}", best_improvement);
-            if gi_star > best_improvement {
-                best_improvement = gi_star;
-                println!("New best improvement: {}", best_improvement);
-            } else {
-                // Stopping criteria mentioned in step 5
-                println!("Stopping criteria met. Moving to step 5...");
-                break;
+            let close_loop_gain = loop_should_be_closed(
+                best_improvement,
+                tot_gain,
+                &x_edge,
+                &t_nodes,
+                city_connections_w_costs,
+            );
+            match close_loop_gain {
+                Some(gi_star) => {
+                    best_improvement = gi_star;
+                }
+                None => {
+                    // Stopping criteria mentioned in step 5
+                    println!("Stopping criteria met. Moving to step 5...");
+                    break;
+                }
             }
 
             // choose new y-i implies t-2i+1
             if let Some((y_edge, t2i_plus_1, gain)) = choose_y_edge(
                 &x_connections,
-                &tsp_problem.city_connections_w_costs,
+                city_connections_w_costs,
                 &t_nodes,
                 &available_nodes,
                 &broken_connections,
@@ -470,25 +519,150 @@ fn step_4_with_back_tracking(
         }
     }
 
-    // Step 5
-    println!("Step 5");
-    // if best_improvement is positive then apply the changes to form T`
-    if best_improvement > 0.0 {
-        println!("Positive gain found. Constructing T'...");
-        let t_prime = construct_t_prime(&t_nodes, &x_connections, &y_connections, &starting_path);
+    return step_5(
+        best_improvement,
+        &t_nodes,
+        &x_connections,
+        &y_connections,
+        &starting_path,
+    );
+}
+
+fn step_4_with_back_tracking(
+    starting_path: &Vec<u64>,
+    tsp_problem: &TSPProblem,
+    pre_selected_t_nodes: &Vec<u64>,
+    pre_selected_x_connections: &Vec<UndirectedEdge>,
+    pre_selected_y_connections: &Vec<UndirectedEdge>,
+    pre_selected_available_nodes: &HashSet<u64>,
+    pre_selected_broken_connections: &HashSet<UndirectedEdge>,
+    pre_selected_joined_connections: &HashSet<UndirectedEdge>,
+    pre_selected_tot_gain: &f32,
+) -> Option<Vec<u64>> {
+    let mut best_improvement = 0.0;
+    let mut tot_gain = *pre_selected_tot_gain;
+    let mut t_nodes = pre_selected_t_nodes.clone();
+    let mut x_connections = pre_selected_x_connections.clone();
+    let mut y_connections = pre_selected_y_connections.clone();
+    let mut available_nodes = pre_selected_available_nodes.clone();
+    let mut broken_connections = pre_selected_broken_connections.clone();
+    let mut joined_connections = pre_selected_joined_connections.clone();
+
+    // Step 4
+    println!("Step 4");
+
+    // Choose x2 and y2 separately because they can be backtracked
+    if let Some((x_edge, t2i)) = choose_x_deterministic_edge(
+        &starting_path,
+        &t_nodes,
+        &available_nodes,
+        &joined_connections,
+        &x_connections,
+    ) {
+        x_connections.push(x_edge);
+        broken_connections.insert(x_edge);
+        t_nodes.push(t2i);
+        available_nodes.remove(&t2i);
+
+        // check gain of closing the loop between t-2i and t1 compared to xi
+        let close_loop_gain = loop_should_be_closed(
+            best_improvement,
+            tot_gain,
+            &x_edge,
+            &t_nodes,
+            &tsp_problem.city_connections_w_costs,
+        );
+        match close_loop_gain {
+            Some(gi_star) => {
+                best_improvement = gi_star;
+            }
+            None => {
+                // Stopping criteria mentioned in step 5
+                println!("Stopping criteria met. Moving to step 5...");
+                return step_5(
+                    best_improvement,
+                    &t_nodes,
+                    &x_connections,
+                    &y_connections,
+                    &starting_path,
+                );
+            }
+        }
+
+        // Go through the y2 viable options in order of value
+        let mut possible_y2_options = get_viable_y_edges_ordered_by_best_value(
+            &t_nodes,
+            &x_connections,
+            &available_nodes,
+            &tsp_problem.city_connections_w_costs,
+            &broken_connections,
+        );
+        possible_y2_options.truncate(MAX_Y_OPTIONS);
         println!(
-            "Constructed T': [{}]",
-            t_prime
+            "Possible y2 options: [{}]",
+            possible_y2_options
                 .iter()
-                .map(|p| p.to_string())
+                .map(|p| format!("{} : {}", p.2.to_string(), p.0.to_string()))
                 .collect::<Vec<_>>()
                 .join(", ")
         );
 
-        return Some(t_prime);
+        if possible_y2_options.is_empty() {
+            // Go to Step 5
+            println!("No profitable y2 edge found. Moving to step 5...");
+            return step_5(
+                best_improvement,
+                &t_nodes,
+                &x_connections,
+                &y_connections,
+                &starting_path,
+            );
+        }
+
+        for (y_edge, t2i_plus_1, gain) in possible_y2_options {
+            // select y-2 implies t-5
+            y_connections.push(y_edge);
+            joined_connections.insert(y_edge);
+            t_nodes.push(t2i_plus_1);
+            available_nodes.remove(&t2i_plus_1);
+            tot_gain += gain;
+
+            // We already know we had positive gain so keep trying to improve
+            let t_prime = step_4_change_loop(
+                best_improvement,
+                tot_gain,
+                starting_path,
+                &t_nodes,
+                &x_connections,
+                &y_connections,
+                &available_nodes,
+                &joined_connections,
+                &broken_connections,
+                &tsp_problem.city_connections_w_costs,
+            );
+
+            if t_prime.is_some() {
+                return t_prime;
+            }
+
+            // Backtrack and undo changes
+            println!("Backtracking to try new y2 edge...");
+            let t5 = t_nodes
+                .pop()
+                .expect("We pushed t5 we should be able to pop.");
+            available_nodes.insert(t5);
+            let y2 = y_connections
+                .pop()
+                .expect("We pushed y2 we should be able to pop.");
+            joined_connections.remove(&y2);
+            tot_gain -= gain;
+        }
+    } else {
+        // x2 could not be broken
+        println!("x2 could not be broken. No changes can be made backtracking...");
+        return None;
     }
 
-    println!("No positive gain found. Backtracking...");
     return None;
 }
 
@@ -661,20 +835,13 @@ fn step_2_with_back_tracking(
 
 fn run_steps_1_through_6(tsp_problem: &TSPProblem) -> (Vec<u64>, f32) {
     // Step 1
-    // let starting_solution = generate_pseudorandom_solution(tsp_problem);
-    let starting_solution = TSPSolution {
-        algorithm_name: TSPAlgorithm::Pseudorandom.to_string(),
-        path: vec![3, 1, 4, 2, 0],
-        tot_cost: 8.58086,
-        optimal: false,
-        calculation_time: 0.0,
-    };
+    let starting_solution = generate_pseudorandom_solution(tsp_problem);
     let mut curr_best_tour = starting_solution.path.clone();
     let mut curr_best_cost = starting_solution.tot_cost;
     println!("Step 1: {:?} : {}", curr_best_tour, curr_best_cost);
-    // backtrack to all possible y2 connections (TOP 5 Best y1 options)
+    // XXXXX backtrack to all possible y2 connections (TOP 5 Best y1 options)
     // choose alternative x2 and use special logic to convert t` into a valid tour
-    // try all y1 options starting at smallest to largest (TOP 5 Best y1 options)
+    // XXXXX try all y1 options starting at smallest to largest (TOP 5 Best y1 options)
     // XXXXX try the alternative x1
     // XXXXX try a different t1
 
