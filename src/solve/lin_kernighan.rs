@@ -1,5 +1,8 @@
 use core::panic;
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Instant,
+};
 
 use ndarray::Array2;
 use rand::prelude::IteratorRandom;
@@ -10,6 +13,7 @@ use crate::types::{
 };
 
 const MAX_Y_OPTIONS: usize = 5;
+const NUM_SOLVES_BEFORE_REDUCTION: u32 = 10;
 
 pub fn generate_pseudorandom_solution(tsp_problem: &TSPProblem) -> TSPSolution {
     // Get start time
@@ -179,10 +183,16 @@ fn x_edge_is_in_edge(
 
     assert_eq!(UndirectedEdge::new(t_2i, t_2i_minus_1), last_xi);
     println!("Checking if ({}, {}) is an in-edge...", t_2i_minus_1, t_2i);
+    println!("TSP Tour: {:?}", tsp_tour);
 
     if t_2i_minus_1 == 0 && t_2i == tsp_tour[0] {
         // This is the in-edge for 0
+        println!("Found in-edge for 0 first.");
         return true;
+    } else if t_2i == 0 && t_2i_minus_1 == tsp_tour[0] {
+        // This is an out edge just not for 0
+        println!("Edge case for first city after 0.");
+        return false;
     }
     for node in tsp_tour.iter() {
         if *node == t_2i_minus_1 {
@@ -538,6 +548,7 @@ fn step_4_with_back_tracking(
     pre_selected_broken_connections: &HashSet<UndirectedEdge>,
     pre_selected_joined_connections: &HashSet<UndirectedEdge>,
     pre_selected_tot_gain: &f32,
+    reduction_edges: &Option<HashSet<UndirectedEdge>>,
 ) -> Option<Vec<u64>> {
     let mut best_improvement = 0.0;
     let mut tot_gain = *pre_selected_tot_gain;
@@ -586,6 +597,13 @@ fn step_4_with_back_tracking(
                     &y_connections,
                     &starting_path,
                 );
+            }
+        }
+
+        // i is now == 4 so the reduction rule can be applied
+        if let Some(edges_to_prohibit) = reduction_edges {
+            for edge in edges_to_prohibit.iter() {
+                joined_connections.insert(*edge);
             }
         }
 
@@ -673,6 +691,7 @@ fn step_3_with_back_tracking(
     pre_selected_x_connections: &Vec<UndirectedEdge>,
     pre_selected_available_nodes: &HashSet<u64>,
     pre_selected_broken_connections: &HashSet<UndirectedEdge>,
+    reduction_edges: &Option<HashSet<UndirectedEdge>>,
 ) -> Option<Vec<u64>> {
     let mut t_nodes = pre_selected_t_nodes.clone();
     let mut y_connections: Vec<UndirectedEdge> = vec![];
@@ -721,6 +740,7 @@ fn step_3_with_back_tracking(
             &pre_selected_broken_connections,
             &joined_connections,
             &tot_gain,
+            reduction_edges,
         );
 
         if t_prime.is_some() {
@@ -746,6 +766,7 @@ fn step_3_with_back_tracking(
 fn step_2_with_back_tracking(
     starting_path: &Vec<u64>,
     tsp_problem: &TSPProblem,
+    reduction_edges: &Option<HashSet<UndirectedEdge>>,
 ) -> Option<Vec<u64>> {
     // Step 2
     println!("Step 2");
@@ -805,6 +826,7 @@ fn step_2_with_back_tracking(
                 &x_connections,
                 &available_nodes,
                 &broken_connections,
+                reduction_edges,
             );
 
             if t_prime.is_some() {
@@ -833,9 +855,19 @@ fn step_2_with_back_tracking(
     return t_prime;
 }
 
-fn run_steps_1_through_6(tsp_problem: &TSPProblem) -> (Vec<u64>, f32) {
+fn run_steps_1_through_6(
+    tsp_problem: &TSPProblem,
+    reduction_edges: &Option<HashSet<UndirectedEdge>>,
+) -> (Vec<u64>, f32) {
     // Step 1
     let starting_solution = generate_pseudorandom_solution(tsp_problem);
+    // let starting_solution = TSPSolution {
+    //     algorithm_name: TSPAlgorithm::LinKernighan.to_string(),
+    //     path: vec![2, 4, 1, 3, 0],
+    //     tot_cost: 5.276084,
+    //     optimal: false,
+    //     calculation_time: 0.0,
+    // };
     let mut curr_best_tour = starting_solution.path.clone();
     let mut curr_best_cost = starting_solution.tot_cost;
     println!("Step 1: {:?} : {}", curr_best_tour, curr_best_cost);
@@ -860,7 +892,15 @@ fn run_steps_1_through_6(tsp_problem: &TSPProblem) -> (Vec<u64>, f32) {
     // for those 5 yi explore the yi with the greatest value of |xi+1| - |yi|
 
     while {
-        let t_prime_opt = step_2_with_back_tracking(&curr_best_tour, tsp_problem);
+        println!(
+            "Going into step 2 with tour {}",
+            curr_best_tour
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        let t_prime_opt = step_2_with_back_tracking(&curr_best_tour, tsp_problem, reduction_edges);
 
         match t_prime_opt {
             Some(t_prime) => {
@@ -914,6 +954,7 @@ pub fn calc_lin_kernighan_heuristic(
 
     let mut best_tour = vec![];
     let mut best_cost = f32::INFINITY;
+    let mut local_optima = HashSet::new();
 
     // Explore run_steps_1_through_6 N times
     // if there are 4 or more unique local optima invoke the reduction rule and keep going another N times
@@ -922,13 +963,70 @@ pub fn calc_lin_kernighan_heuristic(
         "Running Lin-Kernighan heuristic on problem size {}...",
         tsp_problem.num_cities
     );
-    for _ in 0..1 {
-        let (tour, cost) = run_steps_1_through_6(tsp_problem);
+    for _ in 0..NUM_SOLVES_BEFORE_REDUCTION {
+        let (tour, cost) = run_steps_1_through_6(tsp_problem, &None);
         if cost < best_cost {
-            best_tour = tour;
+            best_tour = tour.clone();
             best_cost = cost;
         }
+
+        local_optima.insert(tour);
     }
+    println!("Best Cost After Initial Solve: {}", best_cost);
+    println!(
+        "Best Current Tour After Initial Solve: [{}]",
+        best_tour
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    println!(
+        "Unique Local Optima: {}. Needed {} local optima in order to run reduction.",
+        local_optima.len(),
+        (NUM_SOLVES_BEFORE_REDUCTION as usize) / 2
+    );
+    if local_optima.len() >= (NUM_SOLVES_BEFORE_REDUCTION as usize) / 2 {
+        println!("Running reduction rule...");
+        println!("Unique Local Optima: {:?}", local_optima);
+        // Invoke the reduction rule
+        // Create a list of edges used in most of the local optima
+        let mut common_edges: HashMap<UndirectedEdge, u32> = HashMap::new();
+        for tour in local_optima.iter() {
+            let mut previous_city = 0;
+            for city in tour {
+                let edge = UndirectedEdge::new(previous_city, *city);
+                let count = common_edges.entry(edge).or_insert(0);
+                *count += 1;
+                previous_city = *city;
+            }
+        }
+        println!("Common Edges: {:?}", common_edges);
+
+        let reduction_cutoff = (local_optima.len() as f32 * 0.75) as u32;
+        let reduction_edges: Option<HashSet<UndirectedEdge>> = Some(
+            common_edges
+                .iter()
+                .filter(|(_, count)| **count >= reduction_cutoff)
+                .map(|(edge, _)| edge.clone())
+                .collect(),
+        );
+        println!("Reduction Edges: {:?}", reduction_edges.clone().unwrap());
+
+        for _ in 0..(NUM_SOLVES_BEFORE_REDUCTION * 2) {
+            let (tour, cost) = run_steps_1_through_6(tsp_problem, &reduction_edges);
+            if cost < best_cost {
+                best_tour = tour.clone();
+                best_cost = cost;
+            }
+
+            local_optima.insert(tour);
+        }
+    } else {
+        // There were not many unique local optima so we can assume no further improvement is likely
+    }
+
     println!("Final Cost: {}", best_cost);
     println!(
         "Final Tour: [{}]",
