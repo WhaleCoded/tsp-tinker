@@ -96,8 +96,10 @@ fn get_viable_y_edges_ordered_by_best_value(
     available_nodes: &HashSet<u64>,
     connection_and_cost_matrix: &Array2<f32>,
     broken_connections: &HashSet<UndirectedEdge>,
-) -> Vec<(UndirectedEdge, u64, f32)> {
-    let mut y_edges: Vec<(UndirectedEdge, u64, f32)> = vec![];
+    joined_edges: &HashSet<UndirectedEdge>,
+    curr_t_prime_edges: &Vec<UndirectedEdge>,
+) -> Vec<(UndirectedEdge, u64, f32, f32)> {
+    let mut y_edges: Vec<(UndirectedEdge, u64, f32, f32)> = vec![];
 
     let t_2i = t_nodes[t_nodes.len() - 1];
     let last_xi = x_connections[x_connections.len() - 1];
@@ -113,14 +115,51 @@ fn get_viable_y_edges_ordered_by_best_value(
             println!("Cost of y edge candidate: {}", y_cost);
             let improvement = x_cost - y_cost;
             println!("Improvement: {}", improvement);
-            if improvement > 0.0 {
-                y_edges.push((y_edge_candidate, *node, improvement));
-            }
+
+            // Gain can temporarily be negative
+            y_edges.push((y_edge_candidate, *node, improvement, y_cost));
         }
     }
 
     // Sort by improvement
     y_edges.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+    y_edges.truncate(MAX_Y_OPTIONS);
+
+    // We now have the nearest neighbors now calculate |xi+1| - |yi| and sort by that value
+    let mut y_edges_to_remove = vec![];
+    for (i, (y_edge, y_node, improvement, y_cost)) in y_edges.iter_mut().enumerate() {
+        let t1 = t_nodes[0];
+        let t2i = t_nodes[t_nodes.len() - 1];
+        let t2i_plus_1 = *y_node;
+        let xi_plus_one = choose_x_deterministic_edge(
+            t2i_plus_1,
+            t2i,
+            t1,
+            curr_t_prime_edges,
+            joined_edges,
+            true,
+        );
+
+        match xi_plus_one {
+            Some((next_xi_edge, _)) => {
+                let xi_plus_one_cost = connection_and_cost_matrix
+                    [[next_xi_edge.city_a as usize, next_xi_edge.city_b as usize]];
+
+                println!("Cost of yi: {}", y_cost);
+                println!("Cost of xi+1: {}", xi_plus_one_cost);
+                *y_cost = xi_plus_one_cost - *y_cost;
+                println!("Cost of xi+1 - yi: {}", y_cost);
+            }
+            None => {
+                // This y edge is not viable remove it
+                y_edges_to_remove.push(i);
+            }
+        }
+    }
+    for i in y_edges_to_remove.iter().rev() {
+        y_edges.remove(*i);
+    }
+    y_edges.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap());
 
     return y_edges;
 }
@@ -179,6 +218,7 @@ fn choose_x_deterministic_edge(
     t1: u64,
     curr_t_prime_edges: &Vec<UndirectedEdge>,
     joined_edges: &HashSet<UndirectedEdge>,
+    testing_y_options: bool,
 ) -> Option<(UndirectedEdge, u64)> {
     println!(
         "Choosing a deterministic xi with t1: {}, t2i: {}, t2i+1: {}",
@@ -187,9 +227,19 @@ fn choose_x_deterministic_edge(
     let mut consideration_edges = curr_t_prime_edges.clone();
     let y_index = consideration_edges
         .iter()
-        .position(|&x| x == UndirectedEdge::new(t_2i, t_2i_plus_1))
-        .expect("y edge not found in current edges");
-    consideration_edges.remove(y_index);
+        .position(|&x| x == UndirectedEdge::new(t_2i, t_2i_plus_1));
+    if !testing_y_options {
+        consideration_edges.remove(y_index.expect("y edge not found in consideration edges."));
+    }
+
+    println!(
+        "Consideration edges: [{}]",
+        consideration_edges
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     // Traverse the edges until we find which edge is on the opposite side of t1
     let mut ordered_edges = HashMap::new();
@@ -360,6 +410,7 @@ fn step_4_change_loop(
             t_nodes[0],
             &curr_t_prime_edges,
             &joined_connections,
+            false,
         ) {
             x_connections.push(x_edge);
             broken_connections.insert(x_edge);
@@ -492,6 +543,7 @@ fn step_4_with_back_tracking(
         t_nodes[0],
         &curr_t_prime_edges,
         &joined_connections,
+        false,
     ) {
         x_connections.push(x_edge);
         broken_connections.insert(x_edge);
@@ -532,8 +584,9 @@ fn step_4_with_back_tracking(
             &available_nodes,
             &tsp_problem.city_connections_w_costs,
             &broken_connections,
+            &joined_connections,
+            &curr_t_prime_edges,
         );
-        possible_y2_options.truncate(MAX_Y_OPTIONS);
         println!(
             "Possible y2 options: [{}]",
             possible_y2_options
@@ -549,7 +602,7 @@ fn step_4_with_back_tracking(
             return step_5(best_improvement, &best_t_prime_edges);
         }
 
-        for (y_edge, t2i_plus_1, gain) in possible_y2_options {
+        for (y_edge, t2i_plus_1, gain, _) in possible_y2_options {
             // select y-2 implies t-5
             y_connections.push(y_edge);
             joined_connections.insert(y_edge);
@@ -621,6 +674,14 @@ fn step_3_with_back_tracking(
 
     // Step 3
     println!("Step 3");
+    println!(
+        "Current t prime edges: [{}]",
+        curr_t_prime_edges
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     let mut tot_gain = 0.0;
 
     let mut possible_y1_options = get_viable_y_edges_ordered_by_best_value(
@@ -629,6 +690,8 @@ fn step_3_with_back_tracking(
         &available_nodes,
         &tsp_problem.city_connections_w_costs,
         &pre_selected_broken_connections,
+        &joined_connections,
+        &curr_t_prime_edges,
     );
     println!(
         "Possible y1 options: [{}]",
@@ -638,9 +701,8 @@ fn step_3_with_back_tracking(
             .collect::<Vec<_>>()
             .join(", ")
     );
-    possible_y1_options.truncate(MAX_Y_OPTIONS);
 
-    for (y_edge, t_3, gain) in possible_y1_options {
+    for (y_edge, t_3, gain, _) in possible_y1_options {
         // select y-1 implies t-3
         println!("Selected y1: {}", y_edge);
         println!("This implies t3: {}", t_3);
@@ -879,6 +941,10 @@ fn run_steps_1_through_6(
                     "Cost of T`: {} which gives us a gain of {}",
                     t_prime_cost,
                     curr_best_cost - t_prime_cost
+                );
+                assert!(
+                    t_prime_cost <= curr_best_cost,
+                    "T` should never be worse than T"
                 );
                 curr_best_cost = t_prime_cost;
 
