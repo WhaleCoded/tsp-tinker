@@ -5,9 +5,10 @@ mod serialization;
 mod struct_functionality;
 
 pub use helpers::{
-    convert_undirected_edges_into_tour, convert_undirected_matrix_to_edges,
-    get_num_existing_tsp_problems_by_size, get_num_existing_tsp_problems_by_sub_dir,
-    get_subdirectories_of_tsp_problems, get_tsp_problem_file_paths_by_sub_dir,
+    convert_tour_into_undirected_edges, convert_undirected_edges_into_tour,
+    convert_undirected_matrix_to_edges, get_num_existing_tsp_problems_by_size,
+    get_num_existing_tsp_problems_by_sub_dir, get_subdirectories_of_tsp_problems,
+    get_tsp_problem_file_paths_by_sub_dir,
 };
 
 #[derive(serde::Deserialize, Clone, serde::Serialize)]

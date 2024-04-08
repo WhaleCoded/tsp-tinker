@@ -1,4 +1,3 @@
-use core::panic;
 use std::{
     collections::{HashMap, HashSet},
     time::Instant,
@@ -9,7 +8,8 @@ use rand::prelude::IteratorRandom;
 
 use super::utils::calculate_cost_of_tour;
 use crate::types::{
-    convert_undirected_edges_into_tour, TSPAlgorithm, TSPProblem, TSPSolution, UndirectedEdge,
+    convert_tour_into_undirected_edges, convert_undirected_edges_into_tour, TSPAlgorithm,
+    TSPProblem, TSPSolution, UndirectedEdge,
 };
 
 const MAX_Y_OPTIONS: usize = 5;
@@ -172,218 +172,109 @@ fn choose_y_edge(
     return None;
 }
 
-fn x_edge_is_in_edge(
-    tsp_tour: &Vec<u64>,
-    t_nodes: &Vec<u64>,
-    x_edges: &Vec<UndirectedEdge>,
-) -> bool {
-    let last_xi = x_edges[x_edges.len() - 1];
-    let t_2i = t_nodes[t_nodes.len() - 2];
-    let t_2i_minus_1 = t_nodes[t_nodes.len() - 3];
-
-    assert_eq!(UndirectedEdge::new(t_2i, t_2i_minus_1), last_xi);
-    println!("Checking if ({}, {}) is an in-edge...", t_2i_minus_1, t_2i);
-    println!("TSP Tour: {:?}", tsp_tour);
-
-    if t_2i_minus_1 == 0 && t_2i == tsp_tour[0] {
-        // This is the in-edge for 0
-        println!("Found in-edge for 0 first.");
-        return true;
-    } else if t_2i == 0 && t_2i_minus_1 == tsp_tour[0] {
-        // This is an out edge just not for 0
-        println!("Edge case for first city after 0.");
-        return false;
-    }
-    for node in tsp_tour.iter() {
-        if *node == t_2i_minus_1 {
-            println!("Found t2i-1 first.");
-            return true;
-        } else if *node == t_2i {
-            return false;
-        }
-    }
-
-    panic!("t2i-1 and t2i not found in tsp_tour.");
-}
-
 fn choose_x_deterministic_edge(
-    tsp_tour: &Vec<u64>,
-    t_nodes: &Vec<u64>,
-    available_nodes: &HashSet<u64>,
+    t_2i_plus_1: u64,
+    t_2i: u64,
+    t1: u64,
+    curr_t_prime_edges: &Vec<UndirectedEdge>,
     joined_edges: &HashSet<UndirectedEdge>,
-    x_edges: &Vec<UndirectedEdge>,
 ) -> Option<(UndirectedEdge, u64)> {
-    let t_2i_minus_1 = t_nodes[t_nodes.len() - 1];
-    let mut t_2i = None;
-    let is_in_edge = x_edge_is_in_edge(tsp_tour, t_nodes, x_edges);
-    println!("Is xi in edge: {}", is_in_edge);
+    println!(
+        "Choosing a deterministic xi with t1: {}, t2i: {}, t2i+1: {}",
+        t1, t_2i, t_2i_plus_1
+    );
+    let mut consideration_edges = curr_t_prime_edges.clone();
+    let y_index = consideration_edges
+        .iter()
+        .position(|&x| x == UndirectedEdge::new(t_2i, t_2i_plus_1))
+        .expect("y edge not found in current edges");
+    consideration_edges.remove(y_index);
 
-    println!("Available nodes: {:?}", available_nodes);
-    println!("T nodes: {:?}", t_nodes);
-    for (i, node) in tsp_tour.iter().enumerate() {
-        if *node == t_2i_minus_1 {
-            let mut prospective_t2i = tsp_tour[0];
-            if !is_in_edge {
-                if i != tsp_tour.len() - 1 {
-                    prospective_t2i = tsp_tour[i + 1];
-                }
-            } else {
-                prospective_t2i = tsp_tour[tsp_tour.len() - 1];
-                if i != 0 {
-                    prospective_t2i = tsp_tour[i - 1];
-                }
-            }
-
-            if available_nodes.contains(&prospective_t2i) {
-                t_2i = Some(prospective_t2i);
-                println!("Selected t2i: {}", prospective_t2i);
-                break;
-            }
-
-            println!("t2i not in available nodes. {}", prospective_t2i);
-        }
+    // Traverse the edges until we find which edge is on the opposite side of t1
+    let mut ordered_edges = HashMap::new();
+    for edge in consideration_edges.iter() {
+        let a_edge_vec = ordered_edges.entry(edge.city_a).or_insert(vec![]);
+        a_edge_vec.push(edge);
+        let b_edge_vec = ordered_edges.entry(edge.city_b).or_insert(vec![]);
+        b_edge_vec.push(edge);
     }
 
-    match t_2i {
-        Some(node) => {
-            let selected_x_edge = UndirectedEdge::new(node, t_2i_minus_1);
-            if !joined_edges.contains(&selected_x_edge) {
-                println!("Selected xi: {}", selected_x_edge);
-                return Some((selected_x_edge, node));
+    assert_eq!(ordered_edges[&t1].len(), 1);
+    let mut curr_edge = ordered_edges[&t1][0];
+    let mut curr_node = t1;
+    let mut xi = None;
+    let mut new_t_node = 0;
+    while curr_node != t_2i_plus_1 {
+        println!("Current node: {}, Current edge: {}", curr_node, curr_edge);
+        let next_node = match curr_node {
+            _ if curr_node == curr_edge.city_a => curr_edge.city_b,
+            _ => curr_edge.city_a,
+        };
+
+        let possible_nodes = &ordered_edges[&next_node];
+        println!(
+            "Possible nodes for {}: {}",
+            next_node,
+            possible_nodes
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        assert_eq!(possible_nodes.len(), 2);
+        let next_edge = match possible_nodes[0] {
+            // if this is the next edge curr_node won't be present
+            _ if curr_node == possible_nodes[0].city_a || curr_node == possible_nodes[0].city_b => {
+                possible_nodes[1]
             }
-            println!("xi already in joined edges.");
+            _ => possible_nodes[0],
+        };
+
+        curr_node = next_node;
+        curr_edge = next_edge;
+
+        if curr_node == t_2i_plus_1 {
+            // Return the edge that is opposite of t1
+            new_t_node = match next_edge {
+                _ if next_edge.city_a == curr_node => next_edge.city_b,
+                _ => next_edge.city_a,
+            };
+            xi = Some(next_edge);
+            break;
         }
-        None => {}
+    }
+    assert_eq!(xi.is_some(), true);
+    println!("Selected xi: {}", xi.unwrap());
+
+    if !joined_edges.contains(&xi.unwrap()) {
+        // curr node is the next t2i
+        return Some((*xi.unwrap(), new_t_node));
     }
 
-    println!("No valid xi found.");
+    println!("xi already in joined edges.");
     return None;
 }
 
-fn construct_t_prime(
-    t_nodes: &Vec<u64>,
-    x_connections: &Vec<UndirectedEdge>,
-    y_connections: &Vec<UndirectedEdge>,
-    starting_tour: &Vec<u64>,
-) -> Vec<u64> {
-    let mut t_prime_edges: HashSet<UndirectedEdge> = HashSet::new();
-
-    // Convert T to edges
-    for (i, node) in starting_tour.iter().enumerate() {
-        if i == 0 {
-            t_prime_edges.insert(UndirectedEdge::new(0, *node));
-        } else {
-            t_prime_edges.insert(UndirectedEdge::new(starting_tour[i - 1], *node));
-        }
-    }
-    println!(
-        "Original Edges: [{}]",
-        t_prime_edges
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-
-    // Remove x-edges
-    println!(
-        "T` can't include x-edges: [{}]",
-        x_connections
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-    for x_edge in x_connections.iter() {
-        let removed_x_edge = t_prime_edges.remove(x_edge);
-        if !removed_x_edge {
-            panic!(
-                "x_edge {} not found in T: [{}]",
-                x_edge,
-                t_prime_edges
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-        }
-    }
-
-    // Add y-edges
-    println!(
-        "T` will include y-edges: [{}] and closure edge {:?}",
-        y_connections
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-        (t_nodes[t_nodes.len() - 1], t_nodes[0])
-    );
-    for (i, y_edge) in y_connections.iter().enumerate() {
-        let add_result = t_prime_edges.insert(y_edge.clone());
-        println!("Added y_edge: {} with result {}", y_edge, add_result);
-        if !add_result {
-            panic!(
-                "y_edge {} already in T: [{}]",
-                y_edge,
-                t_prime_edges
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-        }
-
-        if i == y_connections.len() - 1 {
-            // add t2i-t1 connection
-            let add_result =
-                t_prime_edges.insert(UndirectedEdge::new(t_nodes[t_nodes.len() - 1], t_nodes[0]));
-            println!(
-                "Added closure edge: {:?} with result {}",
-                (t_nodes[t_nodes.len() - 1], t_nodes[0]),
-                add_result
-            );
-            if !add_result {
-                panic!(
-                    "closure edge {:?} already in T: [{}]",
-                    (t_nodes[t_nodes.len() - 1], t_nodes[0]),
-                    t_prime_edges
-                        .iter()
-                        .map(|p| p.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-            }
-        }
-    }
-    println!(
-        "Constructed T' edges: [{}]",
-        t_prime_edges
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-
-    // Convert edges back to T'
-    let t_prime_edge_vec = t_prime_edges.into_iter().collect::<Vec<UndirectedEdge>>();
-    let t_prime = convert_undirected_edges_into_tour(starting_tour.len() as u64, &t_prime_edge_vec);
-
-    return t_prime;
-}
-
-fn step_5(
-    best_improvement: f32,
-    t_nodes: &Vec<u64>,
-    x_connections: &Vec<UndirectedEdge>,
-    y_connections: &Vec<UndirectedEdge>,
-    starting_path: &Vec<u64>,
-) -> Option<Vec<u64>> {
+fn step_5(best_improvement: f32, t_prime_edges: &Vec<UndirectedEdge>) -> Option<Vec<u64>> {
     println!("Step 5");
     // if best_improvement is positive then apply the changes to form T`
     if best_improvement > 0.0 {
-        println!("Positive gain found. Constructing T'...");
-        let t_prime = construct_t_prime(&t_nodes, &x_connections, &y_connections, &starting_path);
+        println!(
+            "Positive gain found {}. Constructing T'...",
+            best_improvement
+        );
+
+        let num_cities = t_prime_edges.len() as u64;
+        println!("Number of cities: {}", num_cities);
+        println!(
+            "T' edges: [{}]",
+            t_prime_edges
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        let t_prime = convert_undirected_edges_into_tour(num_cities, &t_prime_edges);
         println!(
             "Constructed T': [{}]",
             t_prime
@@ -427,8 +318,8 @@ fn loop_should_be_closed(
 
 fn step_4_change_loop(
     best_improvement: f32,
+    best_t_prime_edges: &Vec<UndirectedEdge>,
     tot_gain: f32,
-    starting_path: &Vec<u64>,
     pre_selected_t_nodes: &Vec<u64>,
     pre_selected_x_connections: &Vec<UndirectedEdge>,
     pre_selected_y_connections: &Vec<UndirectedEdge>,
@@ -436,8 +327,10 @@ fn step_4_change_loop(
     pre_selected_joined_connections: &HashSet<UndirectedEdge>,
     pre_selected_broken_connections: &HashSet<UndirectedEdge>,
     city_connections_w_costs: &Array2<f32>,
+    pre_selected_curr_t_prime_edges: &Vec<UndirectedEdge>,
 ) -> Option<Vec<u64>> {
     let mut best_improvement = best_improvement;
+    let mut best_t_prime_edges = best_t_prime_edges.clone();
     let mut tot_gain = tot_gain;
     let mut t_nodes = pre_selected_t_nodes.clone();
     let mut x_connections = pre_selected_x_connections.clone();
@@ -445,21 +338,27 @@ fn step_4_change_loop(
     let mut available_nodes = pre_selected_available_nodes.clone();
     let mut broken_connections = pre_selected_broken_connections.clone();
     let mut joined_connections = pre_selected_joined_connections.clone();
+    let mut curr_t_prime_edges = pre_selected_curr_t_prime_edges.clone();
 
     loop {
         if
         // implies t-2i
         let Some((x_edge, t2i)) = choose_x_deterministic_edge(
-            &starting_path,
-            &t_nodes,
-            &available_nodes,
+            t_nodes[t_nodes.len() - 1],
+            t_nodes[t_nodes.len() - 2],
+            t_nodes[0],
+            &curr_t_prime_edges,
             &joined_connections,
-            &x_connections,
         ) {
             x_connections.push(x_edge);
             broken_connections.insert(x_edge);
             t_nodes.push(t2i);
             available_nodes.remove(&t2i);
+            let x_position = curr_t_prime_edges
+                .iter()
+                .position(|&p| p == x_edge)
+                .expect("x edge not found in current edges");
+            curr_t_prime_edges.remove(x_position);
 
             // check gain of closing the loop between t-2i and t1 compared to xi
             let close_loop_gain = loop_should_be_closed(
@@ -472,6 +371,9 @@ fn step_4_change_loop(
             match close_loop_gain {
                 Some(gi_star) => {
                     best_improvement = gi_star;
+                    let closure_edge = UndirectedEdge::new(t_nodes[0], t_nodes[t_nodes.len() - 1]);
+                    best_t_prime_edges = curr_t_prime_edges.clone();
+                    best_t_prime_edges.push(closure_edge);
                 }
                 None => {
                     // Stopping criteria mentioned in step 5
@@ -493,6 +395,7 @@ fn step_4_change_loop(
                 t_nodes.push(t2i_plus_1);
                 available_nodes.remove(&t2i_plus_1);
                 tot_gain += gain;
+                curr_t_prime_edges.push(y_edge);
 
                 // verify gain is positive else stop
             } else {
@@ -506,6 +409,11 @@ fn step_4_change_loop(
             let last_y_edge = y_connections.pop().unwrap();
             println!("Removed yi: {}", last_y_edge);
             joined_connections.remove(&last_y_edge);
+            let y_position = curr_t_prime_edges
+                .iter()
+                .position(|&p| p == last_y_edge)
+                .expect("y edge not found in current edges");
+            curr_t_prime_edges.remove(y_position);
             let last_t_node = t_nodes.pop().unwrap();
             println!("Removed ti: {}", last_t_node);
             available_nodes.insert(last_t_node);
@@ -525,21 +433,22 @@ fn step_4_change_loop(
                     .collect::<Vec<_>>()
                     .join(", ")
             );
+            println!(
+                "Current T` edges: [{}]",
+                curr_t_prime_edges
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
             break;
         }
     }
 
-    return step_5(
-        best_improvement,
-        &t_nodes,
-        &x_connections,
-        &y_connections,
-        &starting_path,
-    );
+    return step_5(best_improvement, &best_t_prime_edges);
 }
 
 fn step_4_with_back_tracking(
-    starting_path: &Vec<u64>,
     tsp_problem: &TSPProblem,
     pre_selected_t_nodes: &Vec<u64>,
     pre_selected_x_connections: &Vec<UndirectedEdge>,
@@ -549,8 +458,10 @@ fn step_4_with_back_tracking(
     pre_selected_joined_connections: &HashSet<UndirectedEdge>,
     pre_selected_tot_gain: &f32,
     reduction_edges: &Option<HashSet<UndirectedEdge>>,
+    pre_selected_curr_t_prime_edges: &Vec<UndirectedEdge>,
 ) -> Option<Vec<u64>> {
     let mut best_improvement = 0.0;
+    let mut best_t_prime_edges = Vec::new();
     let mut tot_gain = *pre_selected_tot_gain;
     let mut t_nodes = pre_selected_t_nodes.clone();
     let mut x_connections = pre_selected_x_connections.clone();
@@ -558,22 +469,28 @@ fn step_4_with_back_tracking(
     let mut available_nodes = pre_selected_available_nodes.clone();
     let mut broken_connections = pre_selected_broken_connections.clone();
     let mut joined_connections = pre_selected_joined_connections.clone();
+    let mut curr_t_prime_edges = pre_selected_curr_t_prime_edges.clone();
 
     // Step 4
     println!("Step 4");
 
     // Choose x2 and y2 separately because they can be backtracked
     if let Some((x_edge, t2i)) = choose_x_deterministic_edge(
-        &starting_path,
-        &t_nodes,
-        &available_nodes,
+        t_nodes[t_nodes.len() - 1],
+        t_nodes[t_nodes.len() - 2],
+        t_nodes[0],
+        &curr_t_prime_edges,
         &joined_connections,
-        &x_connections,
     ) {
         x_connections.push(x_edge);
         broken_connections.insert(x_edge);
         t_nodes.push(t2i);
         available_nodes.remove(&t2i);
+        let x_position = curr_t_prime_edges
+            .iter()
+            .position(|&p| p == x_edge)
+            .expect("x edge not found in current edges");
+        curr_t_prime_edges.remove(x_position);
 
         // check gain of closing the loop between t-2i and t1 compared to xi
         let close_loop_gain = loop_should_be_closed(
@@ -586,17 +503,14 @@ fn step_4_with_back_tracking(
         match close_loop_gain {
             Some(gi_star) => {
                 best_improvement = gi_star;
+                let closure_edge = UndirectedEdge::new(t_nodes[0], t_nodes[t_nodes.len() - 1]);
+                best_t_prime_edges = curr_t_prime_edges.clone();
+                best_t_prime_edges.push(closure_edge);
             }
             None => {
                 // Stopping criteria mentioned in step 5
                 println!("Stopping criteria met. Moving to step 5...");
-                return step_5(
-                    best_improvement,
-                    &t_nodes,
-                    &x_connections,
-                    &y_connections,
-                    &starting_path,
-                );
+                return step_5(best_improvement, &best_t_prime_edges);
             }
         }
 
@@ -628,13 +542,7 @@ fn step_4_with_back_tracking(
         if possible_y2_options.is_empty() {
             // Go to Step 5
             println!("No profitable y2 edge found. Moving to step 5...");
-            return step_5(
-                best_improvement,
-                &t_nodes,
-                &x_connections,
-                &y_connections,
-                &starting_path,
-            );
+            return step_5(best_improvement, &best_t_prime_edges);
         }
 
         for (y_edge, t2i_plus_1, gain) in possible_y2_options {
@@ -644,12 +552,13 @@ fn step_4_with_back_tracking(
             t_nodes.push(t2i_plus_1);
             available_nodes.remove(&t2i_plus_1);
             tot_gain += gain;
+            curr_t_prime_edges.push(y_edge);
 
             // We already know we had positive gain so keep trying to improve
             let t_prime = step_4_change_loop(
                 best_improvement,
+                &best_t_prime_edges,
                 tot_gain,
-                starting_path,
                 &t_nodes,
                 &x_connections,
                 &y_connections,
@@ -657,6 +566,7 @@ fn step_4_with_back_tracking(
                 &joined_connections,
                 &broken_connections,
                 &tsp_problem.city_connections_w_costs,
+                &curr_t_prime_edges,
             );
 
             if t_prime.is_some() {
@@ -674,6 +584,11 @@ fn step_4_with_back_tracking(
                 .expect("We pushed y2 we should be able to pop.");
             joined_connections.remove(&y2);
             tot_gain -= gain;
+            let y_position = curr_t_prime_edges
+                .iter()
+                .position(|&p| p == y2)
+                .expect("y edge not found in current edges");
+            curr_t_prime_edges.remove(y_position);
         }
     } else {
         // x2 could not be broken
@@ -685,18 +600,19 @@ fn step_4_with_back_tracking(
 }
 
 fn step_3_with_back_tracking(
-    starting_path: &Vec<u64>,
     tsp_problem: &TSPProblem,
     pre_selected_t_nodes: &Vec<u64>,
     pre_selected_x_connections: &Vec<UndirectedEdge>,
     pre_selected_available_nodes: &HashSet<u64>,
     pre_selected_broken_connections: &HashSet<UndirectedEdge>,
     reduction_edges: &Option<HashSet<UndirectedEdge>>,
+    pre_selected_curr_t_prime_edges: &Vec<UndirectedEdge>,
 ) -> Option<Vec<u64>> {
     let mut t_nodes = pre_selected_t_nodes.clone();
     let mut y_connections: Vec<UndirectedEdge> = vec![];
     let mut available_nodes = pre_selected_available_nodes.clone();
     let mut joined_connections: HashSet<UndirectedEdge> = HashSet::new();
+    let mut curr_t_prime_edges = pre_selected_curr_t_prime_edges.clone();
 
     // Step 3
     println!("Step 3");
@@ -728,10 +644,10 @@ fn step_3_with_back_tracking(
         available_nodes.remove(&t_3);
         joined_connections.insert(y_edge);
         tot_gain += gain;
+        curr_t_prime_edges.push(y_edge);
 
         // Move to next step
         let t_prime = step_4_with_back_tracking(
-            starting_path,
             tsp_problem,
             &t_nodes,
             &pre_selected_x_connections,
@@ -741,6 +657,7 @@ fn step_3_with_back_tracking(
             &joined_connections,
             &tot_gain,
             reduction_edges,
+            &curr_t_prime_edges,
         );
 
         if t_prime.is_some() {
@@ -758,6 +675,11 @@ fn step_3_with_back_tracking(
             .expect("We pushed y1 we should be able to pop.");
         joined_connections.remove(&y1);
         tot_gain -= gain;
+        let y_position = curr_t_prime_edges
+            .iter()
+            .position(|&p| p == y1)
+            .expect("y edge not found in current edges");
+        curr_t_prime_edges.remove(y_position);
     }
 
     return None;
@@ -775,6 +697,19 @@ fn step_2_with_back_tracking(
     let mut x_connections: Vec<UndirectedEdge> = vec![];
     let mut broken_connections: HashSet<UndirectedEdge> = HashSet::new();
     let mut t_nodes: Vec<u64> = vec![];
+    let mut curr_t_prime_edges: Vec<UndirectedEdge> =
+        convert_tour_into_undirected_edges(starting_path)
+            .into_iter()
+            .collect();
+    println!(
+        "Original Edges {}: [{}]",
+        curr_t_prime_edges.len(),
+        curr_t_prime_edges
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     // get t-1
     let mut t_prime: Option<Vec<u64>> = None;
@@ -805,6 +740,11 @@ fn step_2_with_back_tracking(
 
             println!("Testing {} as x1...", x_edge);
             x_connections.push(x_edge);
+            let x_position = curr_t_prime_edges
+                .iter()
+                .position(|&p| p == x_edge)
+                .expect("x edge not found in current edges");
+            curr_t_prime_edges.remove(x_position);
 
             // This implies t2 push it to t_nodes
             let t2: u64 = match t_node {
@@ -820,13 +760,13 @@ fn step_2_with_back_tracking(
 
             // Step 3 and beyond
             t_prime = step_3_with_back_tracking(
-                starting_path,
                 tsp_problem,
                 &t_nodes,
                 &x_connections,
                 &available_nodes,
                 &broken_connections,
                 reduction_edges,
+                &curr_t_prime_edges,
             );
 
             if t_prime.is_some() {
@@ -841,6 +781,7 @@ fn step_2_with_back_tracking(
             available_nodes.insert(t2);
             x_connections.pop();
             broken_connections.remove(&x_edge);
+            curr_t_prime_edges.push(x_edge);
         }
 
         if t_prime.is_some() {
@@ -890,6 +831,12 @@ fn run_steps_1_through_6(
 
     // Lookahead: instead of choosing the smallest yi look at the 5 smallest yi and consider them relative to the xi connection that will be broken
     // for those 5 yi explore the yi with the greatest value of |xi+1| - |yi|
+
+    // Gain is |xi| - |yi|
+    // Check gain of closing loop before constructing y3...
+    // y2... can be negative as long as the tot gain is still positive
+    // keep the best tour along with G*
+    // The reduction rule should be applied after x4 is chosen not t4
 
     while {
         println!(

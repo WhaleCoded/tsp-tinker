@@ -1,5 +1,6 @@
 use ndarray::Array1;
 use std::{
+    collections::HashSet,
     io::Error,
     path::{Path, PathBuf},
 };
@@ -161,24 +162,45 @@ pub fn convert_undirected_edges_into_tour(
     let mut curr_city: u64 = 0;
     while tour.len() < (num_cities as usize) {
         // Get edge that hasn't been visited for the current city
-        let next_edge = grouped_edges[curr_city as usize]
-            .pop()
-            .expect("There should be exactly 2 edges for each city");
+        let next_edge = grouped_edges[curr_city as usize].pop().expect(&format!(
+            "There should be exactly 2 edges for each city. Current tour is {}--->{:?}",
+            curr_city, tour
+        ));
+        println!("Current city: {}", curr_city);
+        println!("Next edge: {}", next_edge);
 
         // Add the other city of the edge to the tour
         let next_city = match next_edge.city_a {
             _ if curr_city == next_edge.city_a => next_edge.city_b,
             _ => next_edge.city_a,
         };
+        println!("Next city: {}", next_city);
 
         // Remove next_ctiy's edge to curr_city
         grouped_edges[next_city as usize].retain(|edge| edge != &next_edge);
 
         tour.push(next_city);
         curr_city = next_city;
+
+        println!("Tour length: {}/{}", tour.len(), num_cities);
     }
 
     assert!(tour.len() == (num_cities as usize));
 
     return tour;
+}
+
+pub fn convert_tour_into_undirected_edges(tour: &Vec<u64>) -> HashSet<UndirectedEdge> {
+    let mut t_prime_edges: HashSet<UndirectedEdge> = HashSet::new();
+
+    // Convert T to edges
+    for (i, node) in tour.iter().enumerate() {
+        if i == 0 {
+            t_prime_edges.insert(UndirectedEdge::new(0, *node));
+        } else {
+            t_prime_edges.insert(UndirectedEdge::new(tour[i - 1], *node));
+        }
+    }
+
+    return t_prime_edges;
 }
