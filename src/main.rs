@@ -146,7 +146,10 @@ fn main() {
     // Check if we are solving data
     match solve::solve_tsp(
         data_path,
-        vec![(types::TSPAlgorithm::LinKernighan, None)],
+        vec![
+            (types::TSPAlgorithm::NaiveHeuristic, None),
+            (types::TSPAlgorithm::LinKernighan, None),
+        ],
         force,
     ) {
         Ok(_) => println!("TSP problems solved successfully."),

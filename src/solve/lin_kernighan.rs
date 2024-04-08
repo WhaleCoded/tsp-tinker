@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
     time::Instant,
 };
 
@@ -105,16 +104,16 @@ fn get_viable_y_edges_ordered_by_best_value(
     let last_xi = x_connections[x_connections.len() - 1];
     let x_cost = connection_and_cost_matrix[[last_xi.city_a as usize, last_xi.city_b as usize]];
 
-    println!("Available nodes: {:?}", available_nodes);
-    println!("T nodes: {:?}", t_nodes);
+    //println!("Available nodes: {:?}", available_nodes);
+    //println!("T nodes: {:?}", t_nodes);
     for node in available_nodes.iter() {
         let y_edge_candidate = UndirectedEdge::new(t_2i, *node);
-        println!("Checking y edge candidate: {}", y_edge_candidate);
+        //println!("Checking y edge candidate: {}", y_edge_candidate);
         if !broken_connections.contains(&y_edge_candidate) {
             let y_cost = connection_and_cost_matrix[[t_2i as usize, *node as usize]];
-            println!("Cost of y edge candidate: {}", y_cost);
+            //println!("Cost of y edge candidate: {}", y_cost);
             let improvement = x_cost - y_cost;
-            println!("Improvement: {}", improvement);
+            //println!("Improvement: {}", improvement);
 
             // Gain can temporarily be negative
             y_edges.push((y_edge_candidate, *node, improvement, y_cost));
@@ -127,7 +126,7 @@ fn get_viable_y_edges_ordered_by_best_value(
 
     // We now have the nearest neighbors now calculate |xi+1| - |yi| and sort by that value
     let mut y_edges_to_remove = vec![];
-    for (i, (y_edge, y_node, improvement, y_cost)) in y_edges.iter_mut().enumerate() {
+    for (i, (_, y_node, _, y_cost)) in y_edges.iter_mut().enumerate() {
         let t1 = t_nodes[0];
         let t2i = t_nodes[t_nodes.len() - 1];
         let t2i_plus_1 = *y_node;
@@ -145,10 +144,10 @@ fn get_viable_y_edges_ordered_by_best_value(
                 let xi_plus_one_cost = connection_and_cost_matrix
                     [[next_xi_edge.city_a as usize, next_xi_edge.city_b as usize]];
 
-                println!("Cost of yi: {}", y_cost);
-                println!("Cost of xi+1: {}", xi_plus_one_cost);
+                //println!("Cost of yi: {}", y_cost);
+                //println!("Cost of xi+1: {}", xi_plus_one_cost);
                 *y_cost = xi_plus_one_cost - *y_cost;
-                println!("Cost of xi+1 - yi: {}", y_cost);
+                //println!("Cost of xi+1 - yi: {}", y_cost);
             }
             None => {
                 // This y edge is not viable remove it
@@ -179,16 +178,16 @@ fn choose_y_edge(
     let mut best_improvement = 0.0;
     let mut t2i_plus_1 = None;
 
-    println!("Available nodes: {:?}", available_nodes);
-    println!("T nodes: {:?}", t_nodes);
+    //println!("Available nodes: {:?}", available_nodes);
+    //println!("T nodes: {:?}", t_nodes);
     for node in available_nodes.iter() {
         let y_edge_candidate = UndirectedEdge::new(t_2i, *node);
-        println!("Checking y edge candidate: {}", y_edge_candidate);
+        //println!("Checking y edge candidate: {}", y_edge_candidate);
         if !broken_connections.contains(&y_edge_candidate) {
             let y_cost = connection_and_cost_matrix[[t_2i as usize, *node as usize]];
-            println!("Cost of y edge candidate: {}", y_cost);
+            //println!("Cost of y edge candidate: {}", y_cost);
             let improvement = x_cost - y_cost;
-            println!("Improvement: {}", improvement);
+            //println!("Improvement: {}", improvement);
             if improvement > best_improvement {
                 best_improvement = improvement;
                 y_edge = Some(y_edge_candidate);
@@ -200,12 +199,12 @@ fn choose_y_edge(
     match y_edge {
         Some(edge) => {
             let t2i_plus_1 = t2i_plus_1.expect("If an edge is selected t2i+1 should be set.");
-            println!("Selected yi: {}", edge);
-            println!("This implies t2i + 1: {}", t2i_plus_1);
+            //println!("Selected yi: {}", edge);
+            //println!("This implies t2i + 1: {}", t2i_plus_1);
             return Some((edge, t2i_plus_1, best_improvement));
         }
         None => {
-            println!("No profitable y edge found.");
+            //println!("No profitable y edge found.");
         }
     }
 
@@ -220,10 +219,10 @@ fn choose_x_deterministic_edge(
     joined_edges: &HashSet<UndirectedEdge>,
     testing_y_options: bool,
 ) -> Option<(UndirectedEdge, u64)> {
-    println!(
-        "Choosing a deterministic xi with t1: {}, t2i: {}, t2i+1: {}",
-        t1, t_2i, t_2i_plus_1
-    );
+    //println!(
+    //     "Choosing a deterministic xi with t1: {}, t2i: {}, t2i+1: {}",
+    //     t1, t_2i, t_2i_plus_1
+    // );
     let mut consideration_edges = curr_t_prime_edges.clone();
     let y_index = consideration_edges
         .iter()
@@ -232,14 +231,14 @@ fn choose_x_deterministic_edge(
         consideration_edges.remove(y_index.expect("y edge not found in consideration edges."));
     }
 
-    println!(
-        "Consideration edges: [{}]",
-        consideration_edges
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    //println!(
+    //     "Consideration edges: [{}]",
+    //     consideration_edges
+    //         .iter()
+    //         .map(|p| p.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     // Traverse the edges until we find which edge is on the opposite side of t1
     let mut ordered_edges = HashMap::new();
@@ -256,22 +255,22 @@ fn choose_x_deterministic_edge(
     let mut xi = None;
     let mut new_t_node = 0;
     while curr_node != t_2i_plus_1 {
-        println!("Current node: {}, Current edge: {}", curr_node, curr_edge);
+        //println!("Current node: {}, Current edge: {}", curr_node, curr_edge);
         let next_node = match curr_node {
             _ if curr_node == curr_edge.city_a => curr_edge.city_b,
             _ => curr_edge.city_a,
         };
 
         let possible_nodes = &ordered_edges[&next_node];
-        println!(
-            "Possible nodes for {}: {}",
-            next_node,
-            possible_nodes
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        //println!(
+        //     "Possible nodes for {}: {}",
+        //     next_node,
+        //     possible_nodes
+        //         .iter()
+        //         .map(|p| p.to_string())
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
         assert_eq!(possible_nodes.len(), 2);
         let next_edge = match possible_nodes[0] {
             // if this is the next edge curr_node won't be present
@@ -295,45 +294,45 @@ fn choose_x_deterministic_edge(
         }
     }
     assert_eq!(xi.is_some(), true);
-    println!("Selected xi: {}", xi.unwrap());
+    //println!("Selected xi: {}", xi.unwrap());
 
     if !joined_edges.contains(&xi.unwrap()) {
         // curr node is the next t2i
         return Some((*xi.unwrap(), new_t_node));
     }
 
-    println!("xi already in joined edges.");
+    //println!("xi already in joined edges.");
     return None;
 }
 
 fn step_5(best_improvement: f32, t_prime_edges: &Vec<UndirectedEdge>) -> Option<Vec<u64>> {
-    println!("Step 5");
+    //println!("Step 5");
     // if best_improvement is positive then apply the changes to form T`
     if best_improvement > 0.0 {
-        println!(
-            "Positive gain found {}. Constructing T'...",
-            best_improvement
-        );
+        //println!(
+        //     "Positive gain found {}. Constructing T'...",
+        //     best_improvement
+        // );
 
         let num_cities = t_prime_edges.len() as u64;
-        println!("Number of cities: {}", num_cities);
-        println!(
-            "T' edges: [{}]",
-            t_prime_edges
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        //println!("Number of cities: {}", num_cities);
+        //println!(
+        //     "T' edges: [{}]",
+        //     t_prime_edges
+        //         .iter()
+        //         .map(|p| p.to_string())
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
         let t_prime = convert_undirected_edges_into_tour(num_cities, &t_prime_edges);
-        println!(
-            "Constructed T': [{}]",
-            t_prime
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        //println!(
+        //     "Constructed T': [{}]",
+        //     t_prime
+        //         .iter()
+        //         .map(|p| p.to_string())
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
 
         return Some(t_prime);
     }
@@ -349,18 +348,18 @@ fn loop_should_be_closed(
     city_connections_w_costs: &Array2<f32>,
 ) -> Option<f32> {
     // check gain of closing the loop between t-2i and t1 compared to xi
-    println!("Checking gain of closing the loop between t-2i and t1 compared to xi...");
+    //println!("Checking gain of closing the loop between t-2i and t1 compared to xi...");
     let x_cost = city_connections_w_costs[[x_edge.city_a as usize, x_edge.city_b as usize]];
     let close_loop_cost =
         city_connections_w_costs[[t_nodes[0] as usize, t_nodes[t_nodes.len() - 1] as usize]];
     let close_loop_gain = x_cost - close_loop_cost;
     let gi_star = tot_curr_gain + close_loop_gain;
-    println!("Gain of closing the loop: {}", close_loop_gain);
-    println!("Total gain: {}", gi_star);
-    println!("Best improvement so far: {}", best_improvement);
+    //println!("Gain of closing the loop: {}", close_loop_gain);
+    //println!("Total gain: {}", gi_star);
+    //println!("Best improvement so far: {}", best_improvement);
 
     if gi_star > best_improvement {
-        println!("New best improvement: {}", gi_star);
+        //println!("New best improvement: {}", gi_star);
         return Some(gi_star);
     }
 
@@ -439,7 +438,7 @@ fn step_4_change_loop(
                 }
                 None => {
                     // Stopping criteria mentioned in step 5
-                    println!("Stopping criteria met. Moving to step 5...");
+                    //println!("Stopping criteria met. Moving to step 5...");
                     break;
                 }
             }
@@ -462,14 +461,14 @@ fn step_4_change_loop(
                 // verify gain is positive else stop
             } else {
                 // Go to Step 5
-                println!("No profitable y edge found. Moving to step 5...");
+                //println!("No profitable y edge found. Moving to step 5...");
                 break;
             }
         } else {
             // 4-(e) xi+1 could not be broken remove the last yi and ti
-            println!("xi+1 could not be broken. Removing the last yi and ti...");
+            //println!("xi+1 could not be broken. Removing the last yi and ti...");
             let last_y_edge = y_connections.pop().unwrap();
-            println!("Removed yi: {}", last_y_edge);
+            //println!("Removed yi: {}", last_y_edge);
             joined_connections.remove(&last_y_edge);
             let y_position = curr_t_prime_edges
                 .iter()
@@ -477,32 +476,32 @@ fn step_4_change_loop(
                 .expect("y edge not found in current edges");
             curr_t_prime_edges.remove(y_position);
             let last_t_node = t_nodes.pop().unwrap();
-            println!("Removed ti: {}", last_t_node);
+            //println!("Removed ti: {}", last_t_node);
             available_nodes.insert(last_t_node);
-            println!(
-                "y-edges: [{}]",
-                y_connections
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            println!(
-                "t-nodes: [{}]",
-                t_nodes
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            println!(
-                "Current T` edges: [{}]",
-                curr_t_prime_edges
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+            //println!(
+            //     "y-edges: [{}]",
+            //     y_connections
+            //         .iter()
+            //         .map(|p| p.to_string())
+            //         .collect::<Vec<_>>()
+            //         .join(", ")
+            // );
+            //println!(
+            //     "t-nodes: [{}]",
+            //     t_nodes
+            //         .iter()
+            //         .map(|p| p.to_string())
+            //         .collect::<Vec<_>>()
+            //         .join(", ")
+            // );
+            //println!(
+            //     "Current T` edges: [{}]",
+            //     curr_t_prime_edges
+            //         .iter()
+            //         .map(|p| p.to_string())
+            //         .collect::<Vec<_>>()
+            //         .join(", ")
+            // );
             break;
         }
     }
@@ -534,7 +533,7 @@ fn step_4_with_back_tracking(
     let mut curr_t_prime_edges = pre_selected_curr_t_prime_edges.clone();
 
     // Step 4
-    println!("Step 4");
+    //println!("Step 4");
 
     // Choose x2 and y2 separately because they can be backtracked
     if let Some((x_edge, t2i)) = choose_x_deterministic_edge(
@@ -572,13 +571,13 @@ fn step_4_with_back_tracking(
             }
             None => {
                 // Stopping criteria mentioned in step 5
-                println!("Stopping criteria met. Moving to step 5...");
+                //println!("Stopping criteria met. Moving to step 5...");
                 return step_5(best_improvement, &best_t_prime_edges);
             }
         }
 
         // Go through the y2 viable options in order of value
-        let mut possible_y2_options = get_viable_y_edges_ordered_by_best_value(
+        let possible_y2_options = get_viable_y_edges_ordered_by_best_value(
             &t_nodes,
             &x_connections,
             &available_nodes,
@@ -587,18 +586,18 @@ fn step_4_with_back_tracking(
             &joined_connections,
             &curr_t_prime_edges,
         );
-        println!(
-            "Possible y2 options: [{}]",
-            possible_y2_options
-                .iter()
-                .map(|p| format!("{} : {}", p.2.to_string(), p.0.to_string()))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        //println!(
+        //     "Possible y2 options: [{}]",
+        //     possible_y2_options
+        //         .iter()
+        //         .map(|p| format!("{} : {}", p.2.to_string(), p.0.to_string()))
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
 
         if possible_y2_options.is_empty() {
             // Go to Step 5
-            println!("No profitable y2 edge found. Moving to step 5...");
+            //println!("No profitable y2 edge found. Moving to step 5...");
             return step_5(best_improvement, &best_t_prime_edges);
         }
 
@@ -632,7 +631,7 @@ fn step_4_with_back_tracking(
             }
 
             // Backtrack and undo changes
-            println!("Backtracking to try new y2 edge...");
+            //println!("Backtracking to try new y2 edge...");
             let t5 = t_nodes
                 .pop()
                 .expect("We pushed t5 we should be able to pop.");
@@ -650,7 +649,7 @@ fn step_4_with_back_tracking(
         }
     } else {
         // x2 could not be broken
-        println!("x2 could not be broken. No changes can be made backtracking...");
+        //println!("x2 could not be broken. No changes can be made backtracking...");
         return None;
     }
 
@@ -673,18 +672,18 @@ fn step_3_with_back_tracking(
     let mut curr_t_prime_edges = pre_selected_curr_t_prime_edges.clone();
 
     // Step 3
-    println!("Step 3");
-    println!(
-        "Current t prime edges: [{}]",
-        curr_t_prime_edges
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    //println!("Step 3");
+    //println!(
+    //     "Current t prime edges: [{}]",
+    //     curr_t_prime_edges
+    //         .iter()
+    //         .map(|p| p.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
     let mut tot_gain = 0.0;
 
-    let mut possible_y1_options = get_viable_y_edges_ordered_by_best_value(
+    let possible_y1_options = get_viable_y_edges_ordered_by_best_value(
         &t_nodes,
         &pre_selected_x_connections,
         &available_nodes,
@@ -693,19 +692,19 @@ fn step_3_with_back_tracking(
         &joined_connections,
         &curr_t_prime_edges,
     );
-    println!(
-        "Possible y1 options: [{}]",
-        possible_y1_options
-            .iter()
-            .map(|p| format!("{} : {}", p.2.to_string(), p.0.to_string()))
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    //println!(
+    //     "Possible y1 options: [{}]",
+    //     possible_y1_options
+    //         .iter()
+    //         .map(|p| format!("{} : {}", p.2.to_string(), p.0.to_string()))
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     for (y_edge, t_3, gain, _) in possible_y1_options {
         // select y-1 implies t-3
-        println!("Selected y1: {}", y_edge);
-        println!("This implies t3: {}", t_3);
+        //println!("Selected y1: {}", y_edge);
+        //println!("This implies t3: {}", t_3);
         y_connections.push(y_edge);
         t_nodes.push(t_3);
         available_nodes.remove(&t_3);
@@ -732,7 +731,7 @@ fn step_3_with_back_tracking(
         }
 
         // Backtrack and undo changes
-        println!("Backtracking to try new y1 edge...");
+        //println!("Backtracking to try new y1 edge...");
         let t3 = t_nodes
             .pop()
             .expect("We pushed t3 we should be able to pop.");
@@ -758,7 +757,7 @@ fn step_2_with_back_tracking(
     reduction_edges: &Option<HashSet<UndirectedEdge>>,
 ) -> Option<Vec<u64>> {
     // Step 2
-    println!("Step 2");
+    //println!("Step 2");
     let t_node_choices = (0..tsp_problem.num_cities).collect::<Vec<u64>>();
     let mut available_nodes: HashSet<u64> = HashSet::from_iter(t_node_choices.iter().cloned());
     let mut x_connections: Vec<UndirectedEdge> = vec![];
@@ -768,20 +767,20 @@ fn step_2_with_back_tracking(
         convert_tour_into_undirected_edges(starting_path)
             .into_iter()
             .collect();
-    println!(
-        "Original Edges {}: [{}]",
-        curr_t_prime_edges.len(),
-        curr_t_prime_edges
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    //println!(
+    //     "Original Edges {}: [{}]",
+    //     curr_t_prime_edges.len(),
+    //     curr_t_prime_edges
+    //         .iter()
+    //         .map(|p| p.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     // get t-1
     let mut t_prime: Option<Vec<u64>> = None;
     for t_node in t_node_choices.iter() {
-        println!("Selected t-1: {}", t_node);
+        //println!("Selected t-1: {}", t_node);
         t_nodes.push(*t_node);
         available_nodes.remove(&t_node);
 
@@ -805,7 +804,7 @@ fn step_2_with_back_tracking(
                 "All nodes should be available except t1."
             );
 
-            println!("Testing {} as x1...", x_edge);
+            //println!("Testing {} as x1...", x_edge);
             x_connections.push(x_edge);
             let x_position = curr_t_prime_edges
                 .iter()
@@ -818,12 +817,12 @@ fn step_2_with_back_tracking(
                 _ if *t_node == x_edge.city_a => x_edge.city_b,
                 _ => x_edge.city_a,
             };
-            println!("This implies t2: {}", t2);
+            //println!("This implies t2: {}", t2);
             broken_connections.insert(x_edge);
             t_nodes.push(t2);
             available_nodes.remove(&t2);
-            println!("Available nodes: {:?}", available_nodes);
-            println!("T nodes: {:?}", t_nodes);
+            //println!("Available nodes: {:?}", available_nodes);
+            //println!("T nodes: {:?}", t_nodes);
 
             // Step 3 and beyond
             t_prime = step_3_with_back_tracking(
@@ -841,7 +840,7 @@ fn step_2_with_back_tracking(
             }
 
             // Undo our changes
-            println!("Backtracking to try new x1 edge...");
+            //println!("Backtracking to try new x1 edge...");
             let t2 = t_nodes
                 .pop()
                 .expect("We pushed t2 we should be able to pop.");
@@ -879,10 +878,10 @@ fn run_steps_1_through_6(
     // };
     let mut curr_best_tour = starting_solution.path.clone();
     let mut curr_best_cost = starting_solution.tot_cost;
-    println!("Step 1: {:?} : {}", curr_best_tour, curr_best_cost);
+    //println!("Step 1: {:?} : {}", curr_best_tour, curr_best_cost);
 
     if checkout_time_avoider.contains(&curr_best_tour) {
-        println!("Avoiding duplicate tour...");
+        //println!("Avoiding duplicate tour...");
         return (curr_best_tour, curr_best_cost);
     }
     checkout_time_avoider.insert(curr_best_tour.clone());
@@ -914,34 +913,34 @@ fn run_steps_1_through_6(
     // The reduction rule should be applied after x4 is chosen not t4
 
     while {
-        println!(
-            "Going into step 2 with tour {}",
-            curr_best_tour
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        //println!(
+        //     "Going into step 2 with tour {}",
+        //     curr_best_tour
+        //         .iter()
+        //         .map(|p| p.to_string())
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
         let t_prime_opt = step_2_with_back_tracking(&curr_best_tour, tsp_problem, reduction_edges);
 
         match t_prime_opt {
             Some(t_prime) => {
-                println!(
-                    "We found an improved T` tour: [{}]",
-                    t_prime
-                        .iter()
-                        .map(|p| p.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
+                //println!(
+                //     "We found an improved T` tour: [{}]",
+                //     t_prime
+                //         .iter()
+                //         .map(|p| p.to_string())
+                //         .collect::<Vec<_>>()
+                //         .join(", ")
+                // );
                 // Calc cost of tour
                 let t_prime_cost =
                     calculate_cost_of_tour(&t_prime, &tsp_problem.city_connections_w_costs);
-                println!(
-                    "Cost of T`: {} which gives us a gain of {}",
-                    t_prime_cost,
-                    curr_best_cost - t_prime_cost
-                );
+                //println!(
+                //     "Cost of T`: {} which gives us a gain of {}",
+                //     t_prime_cost,
+                //     curr_best_cost - t_prime_cost
+                // );
                 assert!(
                     t_prime_cost <= curr_best_cost,
                     "T` should never be worse than T"
@@ -951,7 +950,7 @@ fn run_steps_1_through_6(
                 curr_best_tour = t_prime;
 
                 if checkout_time_avoider.contains(&curr_best_tour) {
-                    println!("Avoiding duplicate tour...");
+                    //println!("Avoiding duplicate tour...");
                     return (curr_best_tour, curr_best_cost);
                 } else {
                     checkout_time_avoider.insert(curr_best_tour.clone());
@@ -960,9 +959,9 @@ fn run_steps_1_through_6(
             }
             None => {
                 // Backtracking failed to find a better tour
-                println!(
-                    "No improvement found after backtracking. Returning best solution so far..."
-                );
+                //println!(
+                //     "No improvement found after backtracking. Returning best solution so far..."
+                // );
                 false
             }
         }
@@ -993,10 +992,10 @@ pub fn calc_lin_kernighan_heuristic(
     // Explore run_steps_1_through_6 N times
     // if there are 4 or more unique local optima invoke the reduction rule and keep going another N times
     // else return the best local optima so far (it is likely there will be no significant improvement)
-    println!(
-        "Running Lin-Kernighan heuristic on problem size {}...",
-        tsp_problem.num_cities
-    );
+    //println!(
+    //     "Running Lin-Kernighan heuristic on problem size {}...",
+    //     tsp_problem.num_cities
+    // );
     for _ in 0..NUM_SOLVES_BEFORE_REDUCTION {
         let (tour, cost) = run_steps_1_through_6(tsp_problem, &None, &mut checkout_time_avoider);
         if cost < best_cost {
@@ -1006,24 +1005,24 @@ pub fn calc_lin_kernighan_heuristic(
 
         local_optima.insert(tour);
     }
-    println!("Best Cost After Initial Solve: {}", best_cost);
-    println!(
-        "Best Current Tour After Initial Solve: [{}]",
-        best_tour
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    //println!("Best Cost After Initial Solve: {}", best_cost);
+    //println!(
+    //     "Best Current Tour After Initial Solve: [{}]",
+    //     best_tour
+    //         .iter()
+    //         .map(|p| p.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
-    println!(
-        "Unique Local Optima: {}. Needed {} local optima in order to run reduction.",
-        local_optima.len(),
-        (NUM_SOLVES_BEFORE_REDUCTION as usize) / 2
-    );
-    if local_optima.len() >= (NUM_SOLVES_BEFORE_REDUCTION as usize) / 2 {
-        println!("Running reduction rule...");
-        println!("Unique Local Optima: {:?}", local_optima);
+    //println!(
+    //     "Unique Local Optima: {}. Needed {} local optima in order to run reduction.",
+    //     local_optima.len(),
+    //     (NUM_SOLVES_BEFORE_REDUCTION as usize) / 2
+    // );
+    if local_optima.len() >= 4 {
+        //println!("Running reduction rule...");
+        //println!("Unique Local Optima: {:?}", local_optima);
         // Invoke the reduction rule
         // Create a list of edges used in most of the local optima
         let mut common_edges: HashMap<UndirectedEdge, u32> = HashMap::new();
@@ -1036,9 +1035,9 @@ pub fn calc_lin_kernighan_heuristic(
                 previous_city = *city;
             }
         }
-        println!("Common Edges: {:?}", common_edges);
+        //println!("Common Edges: {:?}", common_edges);
 
-        let reduction_cutoff = (local_optima.len() as f32 * 0.75) as u32;
+        let reduction_cutoff = (local_optima.len() as f32 * 0.6) as u32;
         let reduction_edges: Option<HashSet<UndirectedEdge>> = Some(
             common_edges
                 .iter()
@@ -1046,7 +1045,7 @@ pub fn calc_lin_kernighan_heuristic(
                 .map(|(edge, _)| edge.clone())
                 .collect(),
         );
-        println!("Reduction Edges: {:?}", reduction_edges.clone().unwrap());
+        //println!("Reduction Edges: {:?}", reduction_edges.clone().unwrap());
 
         for _ in 0..(NUM_SOLVES_BEFORE_REDUCTION * 2) {
             let (tour, cost) =
@@ -1062,15 +1061,15 @@ pub fn calc_lin_kernighan_heuristic(
         // There were not many unique local optima so we can assume no further improvement is likely
     }
 
-    println!("Final Cost: {}", best_cost);
-    println!(
-        "Final Tour: [{}]",
-        best_tour
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    //println!("Final Cost: {}", best_cost);
+    //println!(
+    //     "Final Tour: [{}]",
+    //     best_tour
+    //         .iter()
+    //         .map(|p| p.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     // Get end time
     let end_time = Instant::now();
