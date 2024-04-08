@@ -166,15 +166,15 @@ pub fn convert_undirected_edges_into_tour(
             "There should be exactly 2 edges for each city. Current tour is {}--->{:?}",
             curr_city, tour
         ));
-        println!("Current city: {}", curr_city);
-        println!("Next edge: {}", next_edge);
+        // println!("Current city: {}", curr_city);
+        // println!("Next edge: {}", next_edge);
 
         // Add the other city of the edge to the tour
         let next_city = match next_edge.city_a {
             _ if curr_city == next_edge.city_a => next_edge.city_b,
             _ => next_edge.city_a,
         };
-        println!("Next city: {}", next_city);
+        // println!("Next city: {}", next_city);
 
         // Remove next_ctiy's edge to curr_city
         grouped_edges[next_city as usize].retain(|edge| edge != &next_edge);
@@ -182,7 +182,7 @@ pub fn convert_undirected_edges_into_tour(
         tour.push(next_city);
         curr_city = next_city;
 
-        println!("Tour length: {}/{}", tour.len(), num_cities);
+        // println!("Tour length: {}/{}", tour.len(), num_cities);
     }
 
     assert!(tour.len() == (num_cities as usize));

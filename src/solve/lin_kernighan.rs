@@ -1,10 +1,15 @@
 use std::{
     collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
     time::Instant,
 };
 
 use ndarray::Array2;
 use rand::prelude::IteratorRandom;
+use rayon::{
+    iter::{IntoParallelIterator, ParallelIterator},
+    ThreadPoolBuilder,
+};
 
 use super::utils::calculate_cost_of_tour;
 use crate::types::{
@@ -13,7 +18,7 @@ use crate::types::{
 };
 
 const MAX_Y_OPTIONS: usize = 5;
-const NUM_SOLVES_BEFORE_REDUCTION: u32 = 10;
+const NUM_SOLVES_BEFORE_REDUCTION: u32 = 30;
 
 pub fn generate_pseudorandom_solution(tsp_problem: &TSPProblem) -> TSPSolution {
     // Get start time
@@ -865,7 +870,7 @@ fn step_2_with_back_tracking(
 fn run_steps_1_through_6(
     tsp_problem: &TSPProblem,
     reduction_edges: &Option<HashSet<UndirectedEdge>>,
-    checkout_time_avoider: &mut HashSet<Vec<u64>>,
+    checkout_time_avoider: Arc<RwLock<HashSet<Vec<u64>>>>,
 ) -> (Vec<u64>, f32) {
     // Step 1
     let starting_solution = generate_pseudorandom_solution(tsp_problem);
@@ -879,12 +884,22 @@ fn run_steps_1_through_6(
     let mut curr_best_tour = starting_solution.path.clone();
     let mut curr_best_cost = starting_solution.tot_cost;
     //println!("Step 1: {:?} : {}", curr_best_tour, curr_best_cost);
-
-    if checkout_time_avoider.contains(&curr_best_tour) {
-        //println!("Avoiding duplicate tour...");
-        return (curr_best_tour, curr_best_cost);
+    {
+        if checkout_time_avoider
+            .read()
+            .expect("Could not acquire read lock on checkout time avoider.")
+            .contains(&curr_best_tour)
+        {
+            //println!("Avoiding duplicate tour...");
+            return (curr_best_tour, curr_best_cost);
+        }
     }
-    checkout_time_avoider.insert(curr_best_tour.clone());
+    {
+        checkout_time_avoider
+            .write()
+            .expect("Could not acquire write lock on checkout time avoider")
+            .insert(curr_best_tour.clone());
+    }
 
     // XXXXX backtrack to all possible y2 connections (TOP 5 Best y1 options)
     // choose alternative x2 and use special logic to convert t` into a valid tour
@@ -949,11 +964,24 @@ fn run_steps_1_through_6(
 
                 curr_best_tour = t_prime;
 
-                if checkout_time_avoider.contains(&curr_best_tour) {
+                let t_prime_already_registered;
+                {
+                    t_prime_already_registered = checkout_time_avoider
+                        .read()
+                        .expect("Could not get read lock for checkout time avoider.")
+                        .contains(&curr_best_tour);
+                }
+
+                if t_prime_already_registered {
                     //println!("Avoiding duplicate tour...");
                     return (curr_best_tour, curr_best_cost);
                 } else {
-                    checkout_time_avoider.insert(curr_best_tour.clone());
+                    {
+                        checkout_time_avoider
+                            .write()
+                            .expect("Could not get write lock for checkout time avoider")
+                            .insert(curr_best_tour.clone());
+                    }
                 }
                 true
             }
@@ -987,7 +1015,19 @@ pub fn calc_lin_kernighan_heuristic(
     let mut best_tour = vec![];
     let mut best_cost = f32::INFINITY;
     let mut local_optima = HashSet::new();
-    let mut checkout_time_avoider: HashSet<Vec<u64>> = HashSet::new();
+    let checkout_time_avoider: HashSet<Vec<u64>> = HashSet::new();
+    let checkout_avoider_lock = Arc::new(RwLock::new(checkout_time_avoider));
+
+    let pool = match ThreadPoolBuilder::new()
+        .num_threads((NUM_SOLVES_BEFORE_REDUCTION * 2).try_into().unwrap())
+        .build()
+    {
+        Ok(pool) => pool,
+        Err(e) => {
+            eprintln!("Error creating thread pool: {}", e);
+            return None;
+        }
+    };
 
     // Explore run_steps_1_through_6 N times
     // if there are 4 or more unique local optima invoke the reduction rule and keep going another N times
@@ -996,8 +1036,18 @@ pub fn calc_lin_kernighan_heuristic(
     //     "Running Lin-Kernighan heuristic on problem size {}...",
     //     tsp_problem.num_cities
     // );
-    for _ in 0..NUM_SOLVES_BEFORE_REDUCTION {
-        let (tour, cost) = run_steps_1_through_6(tsp_problem, &None, &mut checkout_time_avoider);
+    let initial_solve_results: Vec<(Vec<u64>, f32)> = pool.install(|| {
+        (0..NUM_SOLVES_BEFORE_REDUCTION)
+            .into_par_iter()
+            .map(|_| run_steps_1_through_6(tsp_problem, &None, checkout_avoider_lock.clone()))
+            .collect()
+    });
+
+    assert_eq!(
+        initial_solve_results.len(),
+        NUM_SOLVES_BEFORE_REDUCTION as usize
+    );
+    for (tour, cost) in initial_solve_results {
         if cost < best_cost {
             best_tour = tour.clone();
             best_cost = cost;
@@ -1005,6 +1055,25 @@ pub fn calc_lin_kernighan_heuristic(
 
         local_optima.insert(tour);
     }
+    // println!("Best Cost After Initial Solve: {}", best_cost);
+    // println!(
+    //     "Best Current Tour After Initial Solve: [{}]",
+    //     best_tour
+    //         .iter()
+    //         .map(|p| p.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
+    // println!("Unique Local Optima: {}", local_optima.len());
+    // for _ in 0..NUM_SOLVES_BEFORE_REDUCTION {
+    //     let (tour, cost) = run_steps_1_through_6(tsp_problem, &None, &checkout_avoider_lock);
+    //     if cost < best_cost {
+    //         best_tour = tour.clone();
+    //         best_cost = cost;
+    //     }
+
+    //     local_optima.insert(tour);
+    // }
     //println!("Best Cost After Initial Solve: {}", best_cost);
     //println!(
     //     "Best Current Tour After Initial Solve: [{}]",
@@ -1047,9 +1116,29 @@ pub fn calc_lin_kernighan_heuristic(
         );
         //println!("Reduction Edges: {:?}", reduction_edges.clone().unwrap());
 
-        for _ in 0..(NUM_SOLVES_BEFORE_REDUCTION * 2) {
-            let (tour, cost) =
-                run_steps_1_through_6(tsp_problem, &reduction_edges, &mut checkout_time_avoider);
+        // for _ in 0..(NUM_SOLVES_BEFORE_REDUCTION * 2) {
+        //     let (tour, cost) =
+        //         run_steps_1_through_6(tsp_problem, &reduction_edges, &checkout_avoider_lock);
+        //     if cost < best_cost {
+        //         best_tour = tour.clone();
+        //         best_cost = cost;
+        //     }
+
+        //     local_optima.insert(tour);
+        // }
+        let reduction_solve_results: Vec<(Vec<u64>, f32)> = pool.install(|| {
+            (0..NUM_SOLVES_BEFORE_REDUCTION * 2)
+                .into_par_iter()
+                .map(|_| {
+                    run_steps_1_through_6(
+                        tsp_problem,
+                        &reduction_edges,
+                        checkout_avoider_lock.clone(),
+                    )
+                })
+                .collect()
+        });
+        for (tour, cost) in reduction_solve_results {
             if cost < best_cost {
                 best_tour = tour.clone();
                 best_cost = cost;
@@ -1057,6 +1146,17 @@ pub fn calc_lin_kernighan_heuristic(
 
             local_optima.insert(tour);
         }
+
+        // println!("Best Cost After Reduction: {}", best_cost);
+        // println!(
+        //     "Best Current Tour After REduction: [{}]",
+        //     best_tour
+        //         .iter()
+        //         .map(|p| p.to_string())
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
+        // println!("Unique Local Optima: {}", local_optima.len());
     } else {
         // There were not many unique local optima so we can assume no further improvement is likely
     }
