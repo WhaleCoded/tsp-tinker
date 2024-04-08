@@ -328,6 +328,7 @@ fn step_4_change_loop(
     pre_selected_broken_connections: &HashSet<UndirectedEdge>,
     city_connections_w_costs: &Array2<f32>,
     pre_selected_curr_t_prime_edges: &Vec<UndirectedEdge>,
+    reduction_edges: &Option<HashSet<UndirectedEdge>>,
 ) -> Option<Vec<u64>> {
     let mut best_improvement = best_improvement;
     let mut best_t_prime_edges = best_t_prime_edges.clone();
@@ -341,6 +342,15 @@ fn step_4_change_loop(
     let mut curr_t_prime_edges = pre_selected_curr_t_prime_edges.clone();
 
     loop {
+        if x_connections.len() == 4 {
+            // i is now == 4 so the reduction rule can be applied
+            if let Some(edges_to_prohibit) = reduction_edges {
+                for edge in edges_to_prohibit.iter() {
+                    joined_connections.insert(*edge);
+                }
+            }
+        }
+
         if
         // implies t-2i
         let Some((x_edge, t2i)) = choose_x_deterministic_edge(
@@ -514,13 +524,6 @@ fn step_4_with_back_tracking(
             }
         }
 
-        // i is now == 4 so the reduction rule can be applied
-        if let Some(edges_to_prohibit) = reduction_edges {
-            for edge in edges_to_prohibit.iter() {
-                joined_connections.insert(*edge);
-            }
-        }
-
         // Go through the y2 viable options in order of value
         let mut possible_y2_options = get_viable_y_edges_ordered_by_best_value(
             &t_nodes,
@@ -567,6 +570,7 @@ fn step_4_with_back_tracking(
                 &broken_connections,
                 &tsp_problem.city_connections_w_costs,
                 &curr_t_prime_edges,
+                reduction_edges,
             );
 
             if t_prime.is_some() {
