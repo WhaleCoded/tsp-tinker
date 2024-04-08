@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     time::Instant,
 };
 
@@ -803,6 +804,7 @@ fn step_2_with_back_tracking(
 fn run_steps_1_through_6(
     tsp_problem: &TSPProblem,
     reduction_edges: &Option<HashSet<UndirectedEdge>>,
+    checkout_time_avoider: &mut HashSet<Vec<u64>>,
 ) -> (Vec<u64>, f32) {
     // Step 1
     let starting_solution = generate_pseudorandom_solution(tsp_problem);
@@ -816,6 +818,13 @@ fn run_steps_1_through_6(
     let mut curr_best_tour = starting_solution.path.clone();
     let mut curr_best_cost = starting_solution.tot_cost;
     println!("Step 1: {:?} : {}", curr_best_tour, curr_best_cost);
+
+    if checkout_time_avoider.contains(&curr_best_tour) {
+        println!("Avoiding duplicate tour...");
+        return (curr_best_tour, curr_best_cost);
+    }
+    checkout_time_avoider.insert(curr_best_tour.clone());
+
     // XXXXX backtrack to all possible y2 connections (TOP 5 Best y1 options)
     // choose alternative x2 and use special logic to convert t` into a valid tour
     // XXXXX try all y1 options starting at smallest to largest (TOP 5 Best y1 options)
@@ -874,6 +883,13 @@ fn run_steps_1_through_6(
                 curr_best_cost = t_prime_cost;
 
                 curr_best_tour = t_prime;
+
+                if checkout_time_avoider.contains(&curr_best_tour) {
+                    println!("Avoiding duplicate tour...");
+                    return (curr_best_tour, curr_best_cost);
+                } else {
+                    checkout_time_avoider.insert(curr_best_tour.clone());
+                }
                 true
             }
             None => {
@@ -906,6 +922,7 @@ pub fn calc_lin_kernighan_heuristic(
     let mut best_tour = vec![];
     let mut best_cost = f32::INFINITY;
     let mut local_optima = HashSet::new();
+    let mut checkout_time_avoider: HashSet<Vec<u64>> = HashSet::new();
 
     // Explore run_steps_1_through_6 N times
     // if there are 4 or more unique local optima invoke the reduction rule and keep going another N times
@@ -915,7 +932,7 @@ pub fn calc_lin_kernighan_heuristic(
         tsp_problem.num_cities
     );
     for _ in 0..NUM_SOLVES_BEFORE_REDUCTION {
-        let (tour, cost) = run_steps_1_through_6(tsp_problem, &None);
+        let (tour, cost) = run_steps_1_through_6(tsp_problem, &None, &mut checkout_time_avoider);
         if cost < best_cost {
             best_tour = tour.clone();
             best_cost = cost;
@@ -966,7 +983,8 @@ pub fn calc_lin_kernighan_heuristic(
         println!("Reduction Edges: {:?}", reduction_edges.clone().unwrap());
 
         for _ in 0..(NUM_SOLVES_BEFORE_REDUCTION * 2) {
-            let (tour, cost) = run_steps_1_through_6(tsp_problem, &reduction_edges);
+            let (tour, cost) =
+                run_steps_1_through_6(tsp_problem, &reduction_edges, &mut checkout_time_avoider);
             if cost < best_cost {
                 best_tour = tour.clone();
                 best_cost = cost;
