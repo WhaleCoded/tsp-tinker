@@ -149,6 +149,7 @@ fn main() {
         vec![
             (types::TSPAlgorithm::NaiveHeuristic, None),
             (types::TSPAlgorithm::LinKernighan, None),
+            (types::TSPAlgorithm::BranchNBound, None),
         ],
         force,
     ) {

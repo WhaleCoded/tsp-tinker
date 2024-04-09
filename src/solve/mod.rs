@@ -1,3 +1,4 @@
+mod branch_n_bound;
 mod lin_kernighan;
 mod naive_heuristic;
 mod utils;
@@ -72,6 +73,12 @@ pub fn solve_tsp(
                     TSPAlgorithm::BranchNBound => {
                         // Solve the TSP problem using the Branch and Bound algorithm
                         // with the provided timeout
+                        if let Some(bnb_solution) = branch_n_bound::calc_branch_n_bound(
+                            &tsp_packaged_prob.problem_data,
+                            timeout,
+                        ) {
+                            tsp_packaged_prob.solutions.push(bnb_solution);
+                        }
                     }
                     TSPAlgorithm::LinKernighan => {
                         // Solve the TSP problem using the Lin-Kernighan algorithm
