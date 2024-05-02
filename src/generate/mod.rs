@@ -109,7 +109,8 @@ pub fn generate_tsp_problems(
             println!("Received kill signal. Gracefully shutting down...");
             kill_sig_sent.store(true, std::sync::atomic::Ordering::Relaxed);
         }
-    });
+    })
+    .expect("Error setting Ctrl-C handler");
 
     for problem_size in problem_sizes {
         pb.set_message(format!(
@@ -162,7 +163,8 @@ pub fn generate_tsp_problems(
     ctrlc::set_handler(|| {
         println!("Received kill signal. Exiting...");
         std::process::exit(0);
-    });
+    })
+    .expect("Error re-setting Ctrl-C handler");
 
     return Ok(());
 }
