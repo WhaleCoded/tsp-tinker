@@ -82,7 +82,6 @@ pub fn solve_tsp(
                     }
                     TSPAlgorithm::LinKernighan => {
                         // Solve the TSP problem using the Lin-Kernighan algorithm
-                        // with the provided timeout
                         // will return None if the graph is directed
                         if let Some(solution) = lin_kernighan::calc_lin_kernighan_heuristic(
                             &tsp_packaged_prob.problem_data,
