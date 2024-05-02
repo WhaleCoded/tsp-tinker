@@ -1,4 +1,5 @@
 mod euclidean;
+mod random;
 
 use std::io::Error;
 use std::path::Path;
@@ -7,19 +8,39 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
 
-use crate::types::{get_num_existing_tsp_problems_by_size, TSPPackage, TSPProblem};
+use crate::types::{
+    get_num_existing_tsp_problems_by_size, TSPGenerationMethod, TSPPackage, TSPProblem,
+};
 use euclidean::{generate_city_coordinates, generate_euclidean_distance_matrix};
+use random::generate_random_cost_matrix;
 
 const THREAD_POOL_SIZE: usize = 30;
 
-fn generate_single_problem(problem_size: u64, data_path: &Path) -> Result<(), Error> {
-    let city_coordinates = generate_city_coordinates(problem_size, 4);
-    let distance_matrix = generate_euclidean_distance_matrix(&city_coordinates);
+fn generate_single_problem(
+    problem_size: u64,
+    data_path: &Path,
+    gen_method: &TSPGenerationMethod,
+) -> Result<(), Error> {
+    let (cost_matrix, undirected) = match gen_method {
+        TSPGenerationMethod::Euclidean => {
+            let city_coordinates = generate_city_coordinates(problem_size, 4);
+            let distance_matrix = generate_euclidean_distance_matrix(&city_coordinates);
+            (distance_matrix, true)
+        }
+        TSPGenerationMethod::RandomUndirected => {
+            let cost_matrix = generate_random_cost_matrix(problem_size, true);
+            (cost_matrix, true)
+        }
+        TSPGenerationMethod::RandomDirected => {
+            let cost_matrix = generate_random_cost_matrix(problem_size, false);
+            (cost_matrix, false)
+        }
+    };
 
     let tsp_problem = TSPProblem {
         num_cities: problem_size,
-        city_connections_w_costs: distance_matrix,
-        undirected_edges: true,
+        city_connections_w_costs: cost_matrix,
+        undirected_edges: undirected,
     };
     let tsp_package = TSPPackage::new(tsp_problem);
 
@@ -30,6 +51,7 @@ fn generate_single_problem(problem_size: u64, data_path: &Path) -> Result<(), Er
 
 pub fn generate_tsp_problems(
     data_path: &Path,
+    generation_method: TSPGenerationMethod,
     num_problems_per_size: u64,
     starting_problem_size: u64,
     ending_problem_size: Option<u64>,
@@ -89,7 +111,7 @@ pub fn generate_tsp_problems(
         let num_left_to_generate = num_problems_per_size - current_num_problems_generated;
         pool.install(|| {
             (0..num_left_to_generate).into_par_iter().for_each(|_| {
-                match generate_single_problem(problem_size, data_path) {
+                match generate_single_problem(problem_size, data_path, &generation_method) {
                     Ok(_) => pb.inc(1),
                     Err(e) => eprintln!("Error generating TSP problem: {}", e),
                 }
