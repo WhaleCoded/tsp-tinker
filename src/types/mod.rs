@@ -65,3 +65,25 @@ impl TSPAlgorithm {
         }
     }
 }
+
+pub enum TSPGenerationMethod {
+    Euclidean,
+    RandomUndirected,
+    RandomDirected,
+}
+
+impl TSPGenerationMethod {
+    pub fn to_string(&self) -> String {
+        match self {
+            TSPGenerationMethod::Euclidean => {
+                return "Euclidean".to_string();
+            }
+            TSPGenerationMethod::RandomUndirected => {
+                return "Random Undirected".to_string();
+            }
+            TSPGenerationMethod::RandomDirected => {
+                return "Random Directed".to_string();
+            }
+        }
+    }
+}
