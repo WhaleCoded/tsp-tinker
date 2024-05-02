@@ -31,6 +31,7 @@ pub struct TSPProblem {
     pub num_cities: u64,
     pub undirected_edges: bool,
     pub city_connections_w_costs: Array2<f32>,
+    pub generation_method: TSPGenerationMethod,
 }
 
 #[derive(serde::Deserialize, Clone, serde::Serialize)]
@@ -66,6 +67,7 @@ impl TSPAlgorithm {
     }
 }
 
+#[derive(serde::Deserialize, Clone, serde::Serialize)]
 pub enum TSPGenerationMethod {
     Euclidean,
     RandomUndirected,

@@ -51,6 +51,7 @@ fn generate_single_problem(
         num_cities: problem_size,
         city_connections_w_costs: cost_matrix,
         undirected_edges: undirected,
+        generation_method: gen_method.clone(),
     };
     let tsp_package = TSPPackage::new(tsp_problem);
 

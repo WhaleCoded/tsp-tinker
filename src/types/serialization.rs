@@ -3,7 +3,7 @@ use std::fmt;
 use ndarray::{s, Array1, Array2};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 
-use super::TSPProblem;
+use super::{TSPGenerationMethod, TSPProblem};
 
 impl Serialize for TSPProblem {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -13,6 +13,7 @@ impl Serialize for TSPProblem {
         let mut state = serializer.serialize_struct("TSPProblem", 2)?;
         state.serialize_field("num_cities", &self.num_cities)?;
         state.serialize_field("undirected", &self.undirected_edges)?;
+        state.serialize_field("generation_method", &self.generation_method)?;
 
         // If the edges are undirected, we only need to store the upper triangle of the matrix
         // To save space, we will store the upper triangle as a 1D array
@@ -49,6 +50,7 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
             UndirectedEdges,
             UpperTriangleEdges,
             CityConnectionsWCosts,
+            GenerationMethod,
         }
 
         impl<'de> serde::Deserialize<'de> for Field {
@@ -63,7 +65,7 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
 
                     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                         formatter.write_str(
-                            "`num_cities`, `undirected`, `upper_triangle_edges`, or `city_connections_w_costs`"
+                            "`num_cities`, `undirected`, `upper_triangle_edges`, `city_connections_w_costs`, or `generation_method`",
                         )
                     }
 
@@ -76,6 +78,7 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
                             "undirected" => Ok(Field::UndirectedEdges),
                             "upper_triangle_edges" => Ok(Field::UpperTriangleEdges),
                             "city_connections_w_costs" => Ok(Field::CityConnectionsWCosts),
+                            "generation_method" => Ok(Field::GenerationMethod),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -102,6 +105,7 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
                 let mut undirected_edges = None;
                 let mut upper_triangle_edges = None::<Vec<f32>>;
                 let mut city_connections_w_costs = None::<Array2<f32>>;
+                let mut generation_method = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -133,6 +137,12 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
                             }
                             city_connections_w_costs = Some(map.next_value()?);
                         }
+                        Field::GenerationMethod => {
+                            if generation_method.is_some() {
+                                return Err(serde::de::Error::duplicate_field("generation_method"));
+                            }
+                            generation_method = Some(map.next_value()?);
+                        }
                     }
                 }
 
@@ -140,6 +150,8 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
                     num_cities.ok_or_else(|| serde::de::Error::missing_field("num_cities"))?;
                 let undirected_edges: bool = undirected_edges
                     .ok_or_else(|| serde::de::Error::missing_field("undirected"))?;
+                let generation_method: TSPGenerationMethod = generation_method
+                    .ok_or_else(|| serde::de::Error::missing_field("generation_method"))?;
 
                 // Construct the city_connections_w_costs Array2<f32> depending on whether we have undirected edges
                 let city_connections_w_costs = if let Some(edges) = upper_triangle_edges {
@@ -165,6 +177,7 @@ impl<'de> serde::Deserialize<'de> for TSPProblem {
                     num_cities,
                     undirected_edges,
                     city_connections_w_costs,
+                    generation_method,
                 })
             }
         }
