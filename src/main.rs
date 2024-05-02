@@ -119,6 +119,7 @@ fn main() {
 
                 generate::generate_tsp_problems(
                     data_path,
+                    types::TSPGenerationMethod::Euclidean,
                     num_problems_per_size,
                     start_size,
                     Some(*end_size),
@@ -130,7 +131,13 @@ fn main() {
                     num_problems_per_size, start_size
                 );
 
-                generate::generate_tsp_problems(data_path, num_problems_per_size, start_size, None)
+                generate::generate_tsp_problems(
+                    data_path,
+                    types::TSPGenerationMethod::Euclidean,
+                    num_problems_per_size,
+                    start_size,
+                    None,
+                )
             }
         };
 
@@ -149,7 +156,7 @@ fn main() {
         vec![
             (types::TSPAlgorithm::NaiveHeuristic, None),
             (types::TSPAlgorithm::LinKernighan, None),
-            (types::TSPAlgorithm::BranchNBound, None),
+            // (types::TSPAlgorithm::BranchNBound, None),
         ],
         force,
     ) {

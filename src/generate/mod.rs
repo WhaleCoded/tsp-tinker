@@ -3,6 +3,8 @@ mod random;
 
 use std::io::Error;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -20,7 +22,15 @@ fn generate_single_problem(
     problem_size: u64,
     data_path: &Path,
     gen_method: &TSPGenerationMethod,
+    kill_sig_sent: Arc<AtomicBool>,
 ) -> Result<(), Error> {
+    if kill_sig_sent.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(Error::new(
+            std::io::ErrorKind::Other,
+            "Received kill signal. Exiting...",
+        ));
+    }
+
     let (cost_matrix, undirected) = match gen_method {
         TSPGenerationMethod::Euclidean => {
             let city_coordinates = generate_city_coordinates(problem_size, 4);
@@ -90,6 +100,17 @@ pub fn generate_tsp_problems(
             ));
         }
     };
+
+    // Setup Ctrl-C handler to avoid corrupted files
+    let kill_sig_sent = Arc::new(AtomicBool::new(false));
+    ctrlc::set_handler({
+        let kill_sig_sent = kill_sig_sent.clone();
+        move || {
+            println!("Received kill signal. Gracefully shutting down...");
+            kill_sig_sent.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    });
+
     for problem_size in problem_sizes {
         pb.set_message(format!(
             "Generating TSP problems for problem size: {}",
@@ -111,13 +132,37 @@ pub fn generate_tsp_problems(
         let num_left_to_generate = num_problems_per_size - current_num_problems_generated;
         pool.install(|| {
             (0..num_left_to_generate).into_par_iter().for_each(|_| {
-                match generate_single_problem(problem_size, data_path, &generation_method) {
+                match generate_single_problem(
+                    problem_size,
+                    data_path,
+                    &generation_method,
+                    kill_sig_sent.clone(),
+                ) {
                     Ok(_) => pb.inc(1),
-                    Err(e) => eprintln!("Error generating TSP problem: {}", e),
+                    Err(e) => match e.kind() {
+                        std::io::ErrorKind::Other => {
+                            // Received kill signal
+                        }
+                        _ => {
+                            eprintln!("Error generating TSP problem: {}", e);
+                        }
+                    },
                 }
             });
         });
+
+        if kill_sig_sent.load(std::sync::atomic::Ordering::Relaxed) {
+            // Kill signal sent and graceful shutdown has already occurred
+            println!("Graceful shutdown complete.");
+            std::process::exit(0);
+        }
     }
+
+    // The ctrlc_handler is only needed for generation, so we reset it here
+    ctrlc::set_handler(|| {
+        println!("Received kill signal. Exiting...");
+        std::process::exit(0);
+    });
 
     return Ok(());
 }
