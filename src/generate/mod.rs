@@ -103,9 +103,17 @@ pub fn generate_tsp_problems(
 
     // Setup Ctrl-C handler to avoid corrupted files
     let kill_sig_sent = Arc::new(AtomicBool::new(false));
+    let gen_complete = Arc::new(AtomicBool::new(false));
     ctrlc::set_handler({
         let kill_sig_sent = kill_sig_sent.clone();
+        let gen_complete = gen_complete.clone();
         move || {
+            if gen_complete.load(std::sync::atomic::Ordering::Relaxed) {
+                // Generation is complete, so we return to normal logic
+                println!("\nGraceful shutdown complete.");
+                std::process::exit(0);
+            }
+
             println!("Received kill signal. Gracefully shutting down...");
             kill_sig_sent.store(true, std::sync::atomic::Ordering::Relaxed);
         }
@@ -159,12 +167,8 @@ pub fn generate_tsp_problems(
         }
     }
 
-    // The ctrlc_handler is only needed for generation, so we reset it here
-    ctrlc::set_handler(|| {
-        println!("Received kill signal. Exiting...");
-        std::process::exit(0);
-    })
-    .expect("Error re-setting Ctrl-C handler");
+    // The ctrlc_handler is only needed for generation, so mark gen_complete to return to normal logic
+    gen_complete.store(true, std::sync::atomic::Ordering::Relaxed);
 
     return Ok(());
 }
