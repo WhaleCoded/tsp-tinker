@@ -778,10 +778,7 @@ fn run_steps_1_through_6(
     return (curr_best_tour, curr_best_cost);
 }
 
-pub fn calc_lin_kernighan_heuristic(
-    tsp_problem: &TSPProblem,
-    stopping_metric: u32,
-) -> Option<TSPSolution> {
+pub fn calc_lin_kernighan_heuristic(tsp_problem: &TSPProblem) -> Option<TSPSolution> {
     if !tsp_problem.undirected_edges {
         return None;
     }

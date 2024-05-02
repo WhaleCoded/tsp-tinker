@@ -86,7 +86,6 @@ pub fn solve_tsp(
                         // will return None if the graph is directed
                         if let Some(solution) = lin_kernighan::calc_lin_kernighan_heuristic(
                             &tsp_packaged_prob.problem_data,
-                            10,
                         ) {
                             tsp_packaged_prob.solutions.push(solution);
                         }
