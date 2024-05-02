@@ -13,6 +13,7 @@ serde_json = "1.0.115"
 serde = { version = "1.0", features = ["derive"] }
 indicatif = "0.17.8"
 rayon = "1.10"
+ctrlc = "3.4.4"
 
 [dependencies.uuid]
 version = "1.8.0"
